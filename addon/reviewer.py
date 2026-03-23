@@ -31,10 +31,7 @@ class EFDRC:
         self.done_shortcut: Optional[QShortcut] = None
         self.done_shortcut_numpad: Optional[QShortcut] = None
         self.cancel_shortcut: Optional[QShortcut] = None
-        self.undo_shortcut: Optional[QShortcut] = None
         self.custom_undo_shortcut: Optional[QShortcut] = None
-        self.redo_shortcut: Optional[QShortcut] = None
-        self.redo_alt_shortcut: Optional[QShortcut] = None
         self.saved_main_undo_shortcuts: Optional[list[QKeySequence]] = None
         self.saved_main_redo_shortcuts: Optional[list[QKeySequence]] = None
         self.main_editor_pref_snapshot: Optional[Dict[str, Any]] = None
@@ -217,21 +214,12 @@ class EFDRC:
         self.cancel_shortcut.setContext(Qt.ShortcutContext.WindowShortcut)
         qconnect(self.cancel_shortcut.activated, self._on_cancel_shortcut)
 
-        self.undo_shortcut = QShortcut(QKeySequence.StandardKey.Undo, mw)
-        self.undo_shortcut.setContext(Qt.ShortcutContext.WindowShortcut)
-        qconnect(self.undo_shortcut.activated, self._on_editor_undo)
-
+        # Ctrl+Alt+Z: full card restore (configured shortcut).
+        # Ctrl+Z / Ctrl+Y are NOT intercepted — they flow to the webview so
+        # the browser's native undo/redo handles text AND formatting changes.
         self.custom_undo_shortcut = QShortcut(QKeySequence(), mw)
         self.custom_undo_shortcut.setContext(Qt.ShortcutContext.WindowShortcut)
         qconnect(self.custom_undo_shortcut.activated, self._on_card_restore_undo)
-
-        self.redo_shortcut = QShortcut(QKeySequence.StandardKey.Redo, mw)
-        self.redo_shortcut.setContext(Qt.ShortcutContext.WindowShortcut)
-        qconnect(self.redo_shortcut.activated, self._on_editor_redo)
-
-        self.redo_alt_shortcut = QShortcut(QKeySequence("Ctrl+Y"), mw)
-        self.redo_alt_shortcut.setContext(Qt.ShortcutContext.WindowShortcut)
-        qconnect(self.redo_alt_shortcut.activated, self._on_editor_redo)
 
         self._apply_shortcut_config()
         self._set_shortcuts_enabled(False)
@@ -241,10 +229,7 @@ class EFDRC:
             self.done_shortcut,
             self.done_shortcut_numpad,
             self.cancel_shortcut,
-            self.undo_shortcut,
             self.custom_undo_shortcut,
-            self.redo_shortcut,
-            self.redo_alt_shortcut,
         ):
             if shortcut:
                 shortcut.setEnabled(enabled)
@@ -321,44 +306,44 @@ class EFDRC:
         if self._editor_is_visible():
             self.hide_editor()
 
-    def _on_editor_undo(self) -> None:
-        """Ctrl+Z: undo a single text change inside the active editor field."""
-        if not self._editor_is_visible() or not self.editor or not getattr(self.editor, "web", None):
-            return
-        # Ensure the webview has focus so the action is directed correctly
-        self.editor.web.setFocus()
-        # Use the native QWebEnginePage action which is more robust for
-        # complex web apps like Anki's editor and preserves cursor position.
-        self.editor.web.triggerPageAction(QWebEnginePage.WebAction.Undo)
-
     def _on_card_restore_undo(self) -> None:
-        """Ctrl+Alt+Z: restore the note to the snapshot taken when the editor opened."""
+        """Ctrl+Alt+Z / Undo Edit button: restore the note to the snapshot
+        taken when the editor was opened.  We must flush the editor first so
+        that the Python note object reflects the latest webview content."""
         if not self._editor_is_visible() or not self.editor:
             return
-        note = getattr(self.editor, "note", None)
-        if note is None or self.note_snapshot is None:
+        if self.note_snapshot is None:
             return
-        changed = False
-        for field_name, original_value in self.note_snapshot.items():
-            if field_name in note and note[field_name] != original_value:
-                note[field_name] = original_value
-                changed = True
-        if not changed:
-            tooltip("Nothing to restore – note is unchanged from when editing started.")
-            return
-        # Reload the editor UI to reflect the restored values
-        field_idx = self._active_editor_field_idx() or 0
-        card = mw.reviewer.card if mw.reviewer else None
-        if card:
-            self._set_editor_note(note, field_idx, card)
-            self.schedule_editor_refocus(field_idx, delay_ms=120)
-        tooltip("Note restored to state before editing.")
 
-    def _on_editor_redo(self) -> None:
-        if not self._editor_is_visible() or not self.editor or not getattr(self.editor, "web", None):
-            return
-        self.editor.web.setFocus()
-        self.editor.web.triggerPageAction(QWebEnginePage.WebAction.Redo)
+        def _do_restore() -> None:
+            note = getattr(self.editor, "note", None)
+            if note is None or self.note_snapshot is None:
+                return
+            changed = False
+            for field_name, original_value in self.note_snapshot.items():
+                if field_name in note and note[field_name] != original_value:
+                    note[field_name] = original_value
+                    changed = True
+            if not changed:
+                tooltip("Nothing to restore \u2013 note is unchanged from when editing started.")
+                return
+            # Reload the editor to reflect the restored values
+            field_idx = self._active_editor_field_idx() or 0
+            card = mw.reviewer.card if mw.reviewer else None
+            if card:
+                self._set_editor_note(note, field_idx, card)
+                self.schedule_editor_refocus(field_idx, delay_ms=120)
+            tooltip("Note restored to state before editing.")
+
+        # Flush current webview content → Python note object, then restore.
+        save_now = getattr(
+            self.editor, "call_after_note_saved",
+            getattr(self.editor, "saveNow", None),
+        )
+        if callable(save_now):
+            save_now(_do_restore)
+        else:
+            _do_restore()
 
     def _editor_is_visible(self) -> bool:
         return bool(self.editor_widget and not self.editor_widget.isHidden())
