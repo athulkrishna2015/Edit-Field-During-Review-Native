@@ -380,7 +380,9 @@ class EFDRC:
         try:
             flds = ctx.note().model()["flds"]
             idx = next((i for i, fld in enumerate(flds) if fld["name"] == field), 0)
-            return f'<span data-efdrc-idx="{idx}">{txt}</span>'
+            # Add a class if the field is empty to help with selection
+            cls = "efdrc-empty" if not txt.strip() else ""
+            return f'<span data-efdrc-idx="{idx}" class="{cls}">{txt}</span>'
         except Exception:
             return txt
 
