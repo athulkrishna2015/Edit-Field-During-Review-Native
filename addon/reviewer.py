@@ -26,7 +26,7 @@ class EFDRC:
         self.editor: Optional[Editor] = None
         self.editor_widget: Optional[QWidget] = None
         self.editor_container: Optional[QWidget] = None
-        self.undo_btn: Optional[QPushButton] = None
+
         self.done_btn: Optional[QPushButton] = None
         self.done_shortcut: Optional[QShortcut] = None
         self.done_shortcut_numpad: Optional[QShortcut] = None
@@ -117,18 +117,7 @@ class EFDRC:
     def _configured_custom_undo_shortcut(self) -> str:
         return cfg.shortcut_to_text(self.config.get("custom_undo_shortcut"))
 
-    def _undo_button_tooltip(self) -> str:
-        custom_shortcut = self._configured_custom_undo_shortcut()
-        shortcuts_text = f" ({custom_shortcut})" if custom_shortcut else ""
-        return (
-            f"Restore the card to the state before editing{shortcuts_text}.\n"
-            "Use Ctrl+Z to undo individual text changes inside the editor."
-        )
-
     def _refresh_editor_controls(self) -> None:
-        if self.undo_btn:
-            self.undo_btn.setText("Undo Edit")
-            self.undo_btn.setToolTip(self._undo_button_tooltip())
         if self.done_btn:
             self.done_btn.setText("Done (Ctrl+Enter)")
 
@@ -171,9 +160,7 @@ class EFDRC:
         top_layout.setContentsMargins(10, 5, 10, 5)
         top_layout.addWidget(QLabel("<b>Native Field Editor</b>"))
         top_layout.addStretch()
-        self.undo_btn = QPushButton("Undo Edit")
-        self.undo_btn.clicked.connect(self._on_card_restore_undo)
-        top_layout.addWidget(self.undo_btn)
+
         self.done_btn = QPushButton("Done (Ctrl+Enter)")
         self.done_btn.clicked.connect(self.hide_editor)
         top_layout.addWidget(self.done_btn)
@@ -360,8 +347,6 @@ class EFDRC:
         self.pending_refocus_field_idx = None
         if self.refocus_timer.isActive():
             self.refocus_timer.stop()
-        if self.undo_btn:
-            self.undo_btn.setEnabled(False)
         if self.done_btn:
             self.done_btn.setEnabled(True)
 
@@ -635,8 +620,6 @@ class EFDRC:
         self.editor_widget.show()
         self._set_editor_note(note, field_idx, card)
         self.schedule_editor_refocus(field_idx, delay_ms=120)
-        if self.undo_btn:
-            self.undo_btn.setEnabled(True)
         if self.done_btn:
             self.done_btn.setEnabled(True)
 
@@ -653,8 +636,6 @@ class EFDRC:
             return
 
         self._set_shortcuts_enabled(False)
-        if self.undo_btn:
-            self.undo_btn.setEnabled(False)
         if self.done_btn:
             self.done_btn.setEnabled(False)
         if self.editor_widget:
