@@ -9,15 +9,15 @@ This Anki add-on allows you to edit fields directly during review by embedding t
 - **Seamless Integration**: The editor appears above your card content without opening a new window, preserving your review context.
 - **Granular Control**: Enable or disable editing for specific **Note Types**, **Templates (Card Types)**, or **Fields** via a simple tree-view configuration.
 - **Customizable Triggers**: Choose your preferred trigger modifier (Ctrl, Shift, Alt, or None) and action (Click or DoubleClick).
-- **Image Occlusion Support**: Image Occlusion cards can open the embedded editor through the review screen's **Edit** button or the **E** shortcut, even when there is no clickable field on the card.
+- **Image Occlusion Support**: Image Occlusion cards can open the embedded editor through **Ctrl + Click** on the image, the review screen's **Edit** button, or the **E** shortcut, even when there is no clickable field on the card.
 - **Separate Reviewer Preferences**: Keep the embedded reviewer editor's color memory, collapse state, paste behavior, and editor toggles separate from Anki's main editor.
 - **Fast & Reliable**: Uses native components for maximum performance and compatibility with other add-ons.
 
 ## How to Use
 
 1. **Trigger the Editor**: During review, use the default trigger: **Ctrl + Click** (or **Cmd + Click** on Mac) on the field content.
-2. **Image Occlusion Cards**: On Image Occlusion notes, use the review screen's **Edit** button or press **E** to open the embedded editor.
-3. **Visual Feedback**: When holding your trigger modifier, editable fields show a dashed outline on hover.
+2. **Image Occlusion Cards**: On Image Occlusion notes, you can **Ctrl + Click** the image, use the review screen's **Edit** button, or press **E** to open the embedded editor.
+3. **Visual Feedback**: When holding your trigger modifier, editable fields and Image Occlusion areas show a dashed outline on hover.
 4. **Edit Your Content**: The native editor appears above your card. Standard Anki editor shortcuts and toolbar buttons are available.
 5. **Undo While Editing**: Use **Ctrl + Z** while the embedded editor is open, or click the **Undo Edit** button beside **Done**. If another add-on or a global shortcut still grabs `Ctrl+Z`, set a dedicated fallback shortcut in the add-on config.
 6. **Save and Close**: Click the **Done** button, press **Ctrl + Enter**, or press **Esc** to save your changes and return to review immediately.
@@ -35,7 +35,16 @@ Access the configuration via **Tools > Add-ons > EFDRN > Config**.
 - **Exclusions**: Use the tree view to disable editing for specific Note Types, Templates, or Fields. Use the **Enable All** and **Disable All** buttons for bulk management.
 - **Support Tab**: The config dialog also includes a `Support` tab with large QR codes and copy buttons for UPI, BTC, and ETH.
 
-Development, build, and release notes live in [DEVELOPMENT.md](DEVELOPMENT.md).
+## Recent Changes (v6.24.0)
+
+- **Fixed Undo/Redo**: The "Undo Edit" button and shortcuts now reliably refocus the active field before executing, ensuring changes are reverted correctly.
+- **Eliminated Flicker**: The review screen now remains visible during the save transition, removing the "blank screen" jump when finishing an edit.
+- **Image Occlusion Support**: Added **Ctrl + Click** (or your custom modifier) support directly on Image Occlusion images to trigger the editor.
+- **Architectural Cleanup**: Refactored the internal code into specialized modules (`editor`, `utils`, `config`) for better stability and faster loading on newer Anki versions.
+
+## Known Issues
+
+- **Undo Reliability**: The "Undo Edit" button and the `Ctrl+Z` shortcut inside the embedded editor may still be inconsistent on some systems or Anki versions. We are investigating a more robust fix for the editor's internal undo stack.
 
 ## Credits & License
 

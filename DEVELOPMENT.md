@@ -6,7 +6,10 @@ This repository contains the source for the **Edit Field During Review (Native)*
 
 - `addon/`: Add-on package contents.
   - `__init__.py`: Entry point.
-  - `reviewer.py`: Main implementation (Reviewer hooks, Editor embedding).
+  - `reviewer.py`: Main orchestrator (Reviewer hooks, UI setup).
+  - `editor.py`: Embedded native Anki `Editor` subclass.
+  - `utils.py`: Card and note analysis utilities (IO detection, field fallbacks).
+  - `config.py`: Configuration management and the Settings dialog.
   - `web/`: Web assets (CSS/JS for visual feedback).
   - `manifest.json`: Add-on metadata.
   - `VERSION`: Local development version file (semantic version string).

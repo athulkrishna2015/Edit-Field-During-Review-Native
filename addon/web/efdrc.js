@@ -25,6 +25,13 @@
                             event.stopPropagation();
                             return;
                         }
+                        // Support for Image Occlusion elements
+                        if (el.id === 'io-overlay' || el.id === 'io-wrapper' || el.id === 'io-header' || el.id === 'io-footer' || el.id === 'io-image') {
+                            window.pycmd('edit');
+                            event.preventDefault();
+                            event.stopPropagation();
+                            return;
+                        }
                         el = el.parentElement;
                     }
                 }

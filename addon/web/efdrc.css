@@ -1,7 +1,17 @@
-.efdrc-active [data-efdrc-idx] {
+.efdrc-active [data-efdrc-idx],
+.efdrc-active #io-overlay,
+.efdrc-active #io-wrapper,
+.efdrc-active #io-header,
+.efdrc-active #io-footer,
+.efdrc-active #io-image {
     outline: 1px dashed #0078d4;
     cursor: pointer;
 }
-.efdrc-active [data-efdrc-idx]:hover {
+.efdrc-active [data-efdrc-idx]:hover,
+.efdrc-active #io-overlay:hover,
+.efdrc-active #io-wrapper:hover,
+.efdrc-active #io-header:hover,
+.efdrc-active #io-footer:hover,
+.efdrc-active #io-image:hover {
     background-color: rgba(0, 120, 212, 0.1);
 }

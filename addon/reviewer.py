@@ -2,47 +2,22 @@
 
 import inspect
 import json
-from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
 import anki
 import aqt
 from anki.cards import Card
-from anki.config import Config
 from anki.notes import Note
 from anki.template import TemplateRenderContext
 from aqt import gui_hooks, mw
-from aqt.editor import Editor, EditorMode
+from aqt.editor import Editor
 from aqt.qt import *
 from aqt.reviewer import Reviewer
 from aqt.utils import tooltip
 
-
-class EmbeddedReviewerEditor(Editor):
-    def onBridgeCmd(self, cmd: str) -> Any:
-        if not self.note:
-            return
-
-        if cmd.startswith("key"):
-            (_type, ord_str, nid_str, txt) = cmd.split(":", 3)
-            ord_idx = int(ord_str)
-            try:
-                nid = int(nid_str)
-            except ValueError:
-                nid = 0
-            if nid != self.note.id:
-                return
-
-            try:
-                self.note.fields[ord_idx] = self.mungeHTML(txt)
-            except IndexError:
-                return
-
-            gui_hooks.editor_did_fire_typing_timer(self.note)
-            self._check_and_update_duplicate_display_async()
-            return
-
-        return super().onBridgeCmd(cmd)
+from . import config as cfg
+from . import utils
+from .editor import EmbeddedReviewerEditor
 
 
 class EFDRC:
@@ -88,6 +63,11 @@ class EFDRC:
 
         mw.addonManager.setConfigAction(__name__, self.on_config_action)
 
+        # Add to Tools menu
+        action = QAction("EFDRN Configuration", mw)
+        qconnect(action.triggered, self.on_config_action)
+        mw.form.menuTools.addAction(action)
+
         if getattr(mw, "state", None) == "review":
             self.schedule_editor_preload()
 
@@ -99,153 +79,44 @@ class EFDRC:
             "trigger_modifier": "Ctrl",
             "trigger_action": "Click",
             "custom_undo_shortcut": "Ctrl+Alt+Z",
-            "separate_editor_preferences": False,
+            "separate_editor_preferences": True,
             "reviewer_editor_preferences": {},
         }
         self.config.setdefault("custom_undo_shortcut", "Ctrl+Alt+Z")
-        self.config.setdefault("separate_editor_preferences", False)
+        self.config.setdefault("separate_editor_preferences", True)
         reviewer_prefs = self.config.setdefault("reviewer_editor_preferences", {})
-        for key, value in self._default_editor_preferences().items():
+        for key, value in cfg.default_editor_preferences().items():
             reviewer_prefs.setdefault(key, value)
-
-    def _default_editor_preferences(self) -> Dict[str, Any]:
-        return {
-            "last_text_color": "#0000ff",
-            "last_highlight_color": "#ffff00",
-            "tags_collapsed": False,
-            "render_mathjax": True,
-            "shrink_images": True,
-            "close_html_tags": True,
-            "custom_color_picker_palette": [],
-            "paste_images_as_png": False,
-            "paste_strips_formatting": False,
-        }
-
-    def _collection_available(self) -> bool:
-        return bool(getattr(mw, "col", None) and getattr(mw, "pm", None))
 
     def _should_separate_editor_preferences(self) -> bool:
         return bool(self.config.get("separate_editor_preferences", False))
 
-    def _collect_editor_preferences(self) -> Dict[str, Any]:
-        prefs = self._default_editor_preferences()
-        if not self._collection_available():
-            return prefs
-
-        profile = mw.pm.profile or {}
-        prefs.update(
-            {
-                "last_text_color": profile.get("lastTextColor", prefs["last_text_color"]),
-                "last_highlight_color": profile.get(
-                    "lastHighlightColor", prefs["last_highlight_color"]
-                ),
-                "tags_collapsed": mw.pm.tags_collapsed(EditorMode.EDIT_CURRENT),
-                "render_mathjax": mw.col.get_config(
-                    "renderMathjax", prefs["render_mathjax"]
-                ),
-                "shrink_images": mw.col.get_config(
-                    "shrinkEditorImages", prefs["shrink_images"]
-                ),
-                "close_html_tags": mw.col.get_config(
-                    "closeHTMLTags", prefs["close_html_tags"]
-                ),
-                "custom_color_picker_palette": list(
-                    mw.col.get_config("customColorPickerPalette", [])
-                ),
-                "paste_images_as_png": mw.col.get_config_bool(
-                    Config.Bool.PASTE_IMAGES_AS_PNG
-                ),
-                "paste_strips_formatting": mw.col.get_config_bool(
-                    Config.Bool.PASTE_STRIPS_FORMATTING
-                ),
-            }
-        )
-        return prefs
-
     def _reviewer_editor_preferences(self) -> Dict[str, Any]:
-        prefs = dict(self._default_editor_preferences())
+        prefs = dict(cfg.default_editor_preferences())
         prefs.update(self.config.get("reviewer_editor_preferences", {}))
         return prefs
-
-    def _set_collection_config(self, key: str, value: Any) -> None:
-        if not self._collection_available():
-            return
-        if mw.col.get_config(key, None) != value:
-            mw.col.set_config(key, value)
-
-    def _set_collection_bool_config(self, key: Config.Bool.V, value: bool) -> None:
-        if not self._collection_available():
-            return
-        if mw.col.get_config_bool(key) != value:
-            mw.col.set_config_bool(key, value)
-
-    def _apply_editor_preferences(self, prefs: Dict[str, Any]) -> None:
-        if not self._collection_available():
-            return
-
-        profile = mw.pm.profile
-        if profile is not None:
-            profile["lastTextColor"] = prefs.get("last_text_color", "#0000ff")
-            profile["lastHighlightColor"] = prefs.get(
-                "last_highlight_color", "#ffff00"
-            )
-
-        mw.pm.set_tags_collapsed(
-            EditorMode.EDIT_CURRENT, bool(prefs.get("tags_collapsed", False))
-        )
-        self._set_collection_config(
-            "renderMathjax", bool(prefs.get("render_mathjax", True))
-        )
-        self._set_collection_config(
-            "shrinkEditorImages", bool(prefs.get("shrink_images", True))
-        )
-        self._set_collection_config(
-            "closeHTMLTags", bool(prefs.get("close_html_tags", True))
-        )
-        self._set_collection_config(
-            "customColorPickerPalette",
-            list(prefs.get("custom_color_picker_palette", [])),
-        )
-        self._set_collection_bool_config(
-            Config.Bool.PASTE_IMAGES_AS_PNG,
-            bool(prefs.get("paste_images_as_png", False)),
-        )
-        self._set_collection_bool_config(
-            Config.Bool.PASTE_STRIPS_FORMATTING,
-            bool(prefs.get("paste_strips_formatting", False)),
-        )
-
-        if self.editor:
-            self.editor.setupColourPalette()
 
     def _activate_reviewer_editor_preferences(self) -> None:
         if not self._should_separate_editor_preferences():
             return
         if self.main_editor_pref_snapshot is None:
-            self.main_editor_pref_snapshot = self._collect_editor_preferences()
-        self._apply_editor_preferences(self._reviewer_editor_preferences())
+            self.main_editor_pref_snapshot = cfg.collect_editor_preferences()
+        cfg.apply_editor_preferences(self._reviewer_editor_preferences(), self.editor)
 
     def _deactivate_reviewer_editor_preferences(self) -> None:
         if self.main_editor_pref_snapshot is None:
             return
 
         if self._should_separate_editor_preferences():
-            self.config["reviewer_editor_preferences"] = self._collect_editor_preferences()
+            self.config["reviewer_editor_preferences"] = cfg.collect_editor_preferences()
             mw.addonManager.writeConfig(__name__, self.config)
 
         snapshot = self.main_editor_pref_snapshot
         self.main_editor_pref_snapshot = None
-        self._apply_editor_preferences(snapshot)
-
-    def _shortcut_to_text(self, shortcut: Any) -> str:
-        if not shortcut:
-            return ""
-        return QKeySequence(str(shortcut).strip()).toString(
-            QKeySequence.SequenceFormat.PortableText
-        )
+        cfg.apply_editor_preferences(snapshot, self.editor)
 
     def _configured_custom_undo_shortcut(self) -> str:
-        return self._shortcut_to_text(self.config.get("custom_undo_shortcut"))
+        return cfg.shortcut_to_text(self.config.get("custom_undo_shortcut"))
 
     def _undo_button_tooltip(self) -> str:
         shortcuts = ["Ctrl+Z"]
@@ -268,272 +139,13 @@ class EFDRC:
             self.custom_undo_shortcut.setKey(QKeySequence(custom_shortcut))
         self._refresh_editor_controls()
 
-    def _support_entries(self) -> list[dict[str, str]]:
-        support_dir = Path(__file__).resolve().parent / "Support"
-        return [
-            {
-                "title": "UPI",
-                "value": "athulkrishnasv2015-2@okhdfcbank",
-                "image": str(support_dir / "UPI.jpg"),
-            },
-            {
-                "title": "Bitcoin (BTC)",
-                "value": "bc1qrrek3m7sr33qujjrktj949wav6mehdsk057cfx",
-                "image": str(support_dir / "BTC.jpg"),
-            },
-            {
-                "title": "Ethereum (ETH)",
-                "value": "0xce6899e4903EcB08bE5Be65E44549fadC3F45D27",
-                "image": str(support_dir / "ETH.jpg"),
-            },
-        ]
-
-    def _copy_support_value(self, value: str, label: str) -> None:
-        clipboard = QGuiApplication.clipboard()
-        if clipboard:
-            clipboard.setText(value)
-            tooltip(f"Copied {label}")
-
-    def _make_support_card(self, entry: dict[str, str]) -> QGroupBox:
-        group = QGroupBox(entry["title"])
-        layout = QVBoxLayout(group)
-        layout.setContentsMargins(12, 12, 12, 12)
-        layout.setSpacing(10)
-
-        value_row = QHBoxLayout()
-        value_edit = QLineEdit(entry["value"])
-        value_edit.setReadOnly(True)
-        value_edit.setCursorPosition(0)
-        copy_btn = QPushButton("Copy")
-        copy_btn.clicked.connect(
-            lambda _checked=False, value=entry["value"], label=entry["title"]: (
-                self._copy_support_value(value, label)
-            )
-        )
-        value_row.addWidget(value_edit, 1)
-        value_row.addWidget(copy_btn)
-        layout.addLayout(value_row)
-
-        qr_label = QLabel()
-        qr_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        qr_label.setMinimumWidth(380)
-        qr_label.setMinimumHeight(420)
-        qr_label.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
-        )
-
-        pixmap = QPixmap(entry["image"])
-        if pixmap.isNull():
-            qr_label.setText("QR image not found.")
-        else:
-            qr_label.setPixmap(
-                pixmap.scaledToWidth(
-                    420, Qt.TransformationMode.SmoothTransformation
-                )
-            )
-
-        layout.addWidget(qr_label, 0, Qt.AlignmentFlag.AlignCenter)
-        return group
-
-    def _build_support_tab(self) -> QWidget:
-        page = QWidget()
-        page_layout = QVBoxLayout(page)
-        page_layout.setContentsMargins(0, 0, 0, 0)
-
-        support_scroll = QScrollArea()
-        support_scroll.setWidgetResizable(True)
-        support_scroll.setHorizontalScrollBarPolicy(
-            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
-        )
-
-        content = QWidget()
-        content_layout = QVBoxLayout(content)
-        content_layout.setContentsMargins(12, 12, 12, 12)
-        content_layout.setSpacing(12)
-
-        intro = QLabel(
-            "If this add-on helps your workflow, you can support its development "
-            "with any of the options below. Each QR code is shown large for easy "
-            "scanning, and the payment ID can be copied with one click."
-        )
-        intro.setWordWrap(True)
-        content_layout.addWidget(intro)
-
-        for entry in self._support_entries():
-            content_layout.addWidget(self._make_support_card(entry))
-
-        content_layout.addStretch()
-        support_scroll.setWidget(content)
-        page_layout.addWidget(support_scroll)
-        return page
-
     def on_config_action(self) -> None:
-        self.load_config()
-        dialog = QDialog(mw)
-        dialog.setWindowTitle("EFDRN Configuration")
-        dialog.setMinimumWidth(600)
-        dialog.setMinimumHeight(600)
-        layout = QVBoxLayout(dialog)
-        tabs = QTabWidget()
-        layout.addWidget(tabs)
-
-        settings_page = QWidget()
-        settings_layout = QVBoxLayout(settings_page)
-
-        global_grp = QGroupBox("General Settings")
-        grid = QGridLayout(global_grp)
-        auto_cb = QCheckBox("Enable by default for all fields")
-        auto_cb.setChecked(self.config.get("auto_enable", True))
-        grid.addWidget(auto_cb, 0, 0, 1, 2)
-        outline_cb = QCheckBox("Show visual outline on Hover")
-        outline_cb.setChecked(self.config.get("show_outline", True))
-        grid.addWidget(outline_cb, 1, 0, 1, 2)
-        grid.addWidget(QLabel("Trigger Modifier:"), 2, 0)
-        mod_combo = QComboBox()
-        mod_combo.addItems(["Ctrl", "Shift", "Alt", "None"])
-        mod_combo.setCurrentText(self.config.get("trigger_modifier", "Ctrl"))
-        grid.addWidget(mod_combo, 2, 1)
-        grid.addWidget(QLabel("Trigger Action:"), 3, 0)
-        act_combo = QComboBox()
-        act_combo.addItems(["Click", "DoubleClick"])
-        act_combo.setCurrentText(self.config.get("trigger_action", "Click"))
-        grid.addWidget(act_combo, 3, 1)
-        grid.addWidget(QLabel("Custom Undo Shortcut:"), 4, 0)
-        undo_shortcut_edit = QKeySequenceEdit()
-        configured_custom_undo = self._configured_custom_undo_shortcut()
-        if configured_custom_undo:
-            undo_shortcut_edit.setKeySequence(QKeySequence(configured_custom_undo))
-        undo_shortcut_edit.setClearButtonEnabled(True)
-        grid.addWidget(undo_shortcut_edit, 4, 1)
-        separate_prefs_cb = QCheckBox(
-            "Keep reviewer editor preferences separate from Anki's main editor"
-        )
-        separate_prefs_cb.setChecked(self._should_separate_editor_preferences())
-        grid.addWidget(separate_prefs_cb, 5, 0, 1, 2)
-        undo_help = QLabel(
-            "Used by the embedded reviewer editor. Leave blank to disable the "
-            "fallback shortcut."
-        )
-        undo_help.setWordWrap(True)
-        grid.addWidget(undo_help, 6, 0, 1, 2)
-        prefs_help = QLabel(
-            "When enabled, changes to color memory, tags collapse state, MathJax, "
-            "image shrink, HTML closing, and paste options stay local to the "
-            "embedded reviewer editor."
-        )
-        prefs_help.setWordWrap(True)
-        grid.addWidget(prefs_help, 7, 0, 1, 2)
-        settings_layout.addWidget(global_grp)
-
-        tree = QTreeWidget()
-        tree.setHeaderLabels(["Note Type / Template / Field"])
-        exclusions = self.config.get("exclusions", {})
-        for model in mw.col.models.all():
-            nt_item = QTreeWidgetItem(tree, [model["name"]])
-            nt_item.setCheckState(
-                0,
-                Qt.CheckState.Unchecked
-                if exclusions.get(model["name"], {}).get("disabled")
-                else Qt.CheckState.Checked,
-            )
-            t_root = QTreeWidgetItem(nt_item, ["Templates"])
-            for template in model["tmpls"]:
-                t_item = QTreeWidgetItem(t_root, [template["name"]])
-                t_item.setCheckState(
-                    0,
-                    Qt.CheckState.Unchecked
-                    if template["name"]
-                    in exclusions.get(model["name"], {}).get("templates", [])
-                    else Qt.CheckState.Checked,
-                )
-            f_root = QTreeWidgetItem(nt_item, ["Fields"])
-            for field in model["flds"]:
-                f_item = QTreeWidgetItem(f_root, [field["name"]])
-                f_item.setCheckState(
-                    0,
-                    Qt.CheckState.Unchecked
-                    if field["name"]
-                    in exclusions.get(model["name"], {}).get("fields", [])
-                    else Qt.CheckState.Checked,
-                )
-        settings_layout.addWidget(tree)
-
-        bulk_row = QHBoxLayout()
-        enable_all_btn = QPushButton("Enable All")
-        disable_all_btn = QPushButton("Disable All")
-        bulk_row.addWidget(enable_all_btn)
-        bulk_row.addWidget(disable_all_btn)
-        bulk_row.addStretch()
-        settings_layout.addLayout(bulk_row)
-
-        def set_all_items(state: Qt.CheckState) -> None:
-            def apply_to_item(item: QTreeWidgetItem) -> None:
-                item.setCheckState(0, state)
-                for idx in range(item.childCount()):
-                    apply_to_item(item.child(idx))
-
-            for idx in range(tree.topLevelItemCount()):
-                apply_to_item(tree.topLevelItem(idx))
-
-        enable_all_btn.clicked.connect(
-            lambda: set_all_items(Qt.CheckState.Checked)
-        )
-        disable_all_btn.clicked.connect(
-            lambda: set_all_items(Qt.CheckState.Unchecked)
-        )
-
-        tabs.addTab(settings_page, "Settings")
-        tabs.addTab(self._build_support_tab(), "Support")
-
-        btns = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
-        )
-        btns.accepted.connect(dialog.accept)
-        btns.rejected.connect(dialog.reject)
-        layout.addWidget(btns)
-
-        if dialog.exec():
-            new_exclusions = {}
-            for idx in range(tree.topLevelItemCount()):
-                note_type_item = tree.topLevelItem(idx)
-                disabled = note_type_item.checkState(0) == Qt.CheckState.Unchecked
-                disabled_templates = [
-                    note_type_item.child(0).child(child_idx).text(0)
-                    for child_idx in range(note_type_item.child(0).childCount())
-                    if note_type_item.child(0).child(child_idx).checkState(0)
-                    == Qt.CheckState.Unchecked
-                ]
-                disabled_fields = [
-                    note_type_item.child(1).child(child_idx).text(0)
-                    for child_idx in range(note_type_item.child(1).childCount())
-                    if note_type_item.child(1).child(child_idx).checkState(0)
-                    == Qt.CheckState.Unchecked
-                ]
-                if disabled or disabled_templates or disabled_fields:
-                    new_exclusions[note_type_item.text(0)] = {
-                        "disabled": disabled,
-                        "templates": disabled_templates,
-                        "fields": disabled_fields,
-                    }
-
-            self.config.update(
-                {
-                    "auto_enable": auto_cb.isChecked(),
-                    "show_outline": outline_cb.isChecked(),
-                    "trigger_modifier": mod_combo.currentText(),
-                    "trigger_action": act_combo.currentText(),
-                    "custom_undo_shortcut": self._shortcut_to_text(
-                        undo_shortcut_edit.keySequence().toString(
-                            QKeySequence.SequenceFormat.PortableText
-                        )
-                    ),
-                    "separate_editor_preferences": separate_prefs_cb.isChecked(),
-                    "exclusions": new_exclusions,
-                }
-            )
-            mw.addonManager.writeConfig(__name__, self.config)
+        def on_save():
+            self.load_config()
             self._filter_cache.clear()
             self._apply_shortcut_config()
+
+        cfg.on_config_action(mw.addonManager, __name__, on_save)
 
     def setup_ui(self) -> None:
         if self.editor_widget:
@@ -711,15 +323,19 @@ class EFDRC:
         if not self._editor_is_visible() or not self.editor or not getattr(self.editor, "web", None):
             return
         self.editor.web.setFocus()
-        self.editor.web.triggerPageAction(QWebEnginePage.WebAction.Undo)
-        self.editor.web.eval("document.execCommand('undo');")
+        self.editor.web.eval(
+            "if (typeof focusField !== 'undefined' && typeof currentField !== 'undefined') "
+            "{ focusField(currentField); } document.execCommand('undo');"
+        )
 
     def _on_editor_redo(self) -> None:
         if not self._editor_is_visible() or not self.editor or not getattr(self.editor, "web", None):
             return
         self.editor.web.setFocus()
-        self.editor.web.triggerPageAction(QWebEnginePage.WebAction.Redo)
-        self.editor.web.eval("document.execCommand('redo');")
+        self.editor.web.eval(
+            "if (typeof focusField !== 'undefined' && typeof currentField !== 'undefined') "
+            "{ focusField(currentField); } document.execCommand('redo');"
+        )
 
     def _editor_is_visible(self) -> bool:
         return bool(self.editor_widget and not self.editor_widget.isHidden())
@@ -740,106 +356,12 @@ class EFDRC:
         if self.done_btn:
             self.done_btn.setEnabled(True)
 
-    def _template_name_for_card(self, card: Card) -> str:
-        try:
-            template = card.template()
-            return template["name"] if template else ""
-        except Exception:
-            return ""
-
-    def _note_is_image_occlusion(self, note: Note) -> bool:
-        kind = note.model().get("originalStockKind")
-        if hasattr(kind, "name"):
-            kind = kind.name
-        if kind == "ORIGINAL_STOCK_KIND_IMAGE_OCCLUSION":
-            return True
-        try:
-            return int(kind) == 6
-        except (TypeError, ValueError):
-            return False
-
-    def _field_allowed_for_card(self, card: Card, field_name: str) -> bool:
-        try:
-            model = card.note().model()
-            exclusions = self.config.get("exclusions", {}).get(model["name"], {})
-            if exclusions.get("disabled"):
-                return False
-            if field_name in exclusions.get("fields", []):
-                return False
-            template_name = self._template_name_for_card(card)
-            if template_name and template_name in exclusions.get("templates", []):
-                return False
-        except Exception:
-            return True
-        return True
-
-    def _field_index_by_name(self, note: Note, field_name: str) -> Optional[int]:
-        for idx, field in enumerate(note.model()["flds"]):
-            if field["name"] == field_name:
-                return idx
-        return None
-
-    def _card_has_any_allowed_field(self, card: Card) -> bool:
-        for field in card.note().model()["flds"]:
-            if self._field_allowed_for_card(card, field["name"]):
-                return True
-        return False
-
-    def _fallback_field_index_for_card(self, card: Card) -> int:
-        note = card.note()
-        model_fields = note.model()["flds"]
-
-        if self._note_is_image_occlusion(note):
-            io_fields = None
-            try:
-                io_fields = mw.backend.get_image_occlusion_fields(note.mid)
-            except Exception:
-                io_fields = None
-
-            preferred_indices = []
-            if io_fields is not None:
-                for attr in ("header", "back_extra", "comments"):
-                    idx = getattr(io_fields, attr, None)
-                    if idx is not None:
-                        preferred_indices.append(int(idx))
-
-            if not preferred_indices:
-                for field_name in ("Header", "Back Extra", "Comments"):
-                    idx = self._field_index_by_name(note, field_name)
-                    if idx is not None:
-                        preferred_indices.append(idx)
-
-            skipped_indices = set()
-            if io_fields is not None:
-                for attr in ("occlusions", "image"):
-                    idx = getattr(io_fields, attr, None)
-                    if idx is not None:
-                        skipped_indices.add(int(idx))
-
-            for idx in preferred_indices:
-                if 0 <= idx < len(model_fields):
-                    field_name = model_fields[idx]["name"]
-                    if self._field_allowed_for_card(card, field_name):
-                        return idx
-
-            for idx, field in enumerate(model_fields):
-                if idx in skipped_indices:
-                    continue
-                if self._field_allowed_for_card(card, field["name"]):
-                    return idx
-
-        for idx, field in enumerate(model_fields):
-            if self._field_allowed_for_card(card, field["name"]):
-                return idx
-
-        return 0
-
     def open_editor_for_current_card(self) -> bool:
         reviewer = getattr(mw, "reviewer", None)
         card = reviewer.card if reviewer and reviewer.card else None
         if not card:
             return False
-        self.show_editor(self._fallback_field_index_for_card(card))
+        self.show_editor(utils.fallback_field_index_for_card(card, self.config))
         return True
 
     def open_image_occlusion_editor(self) -> bool:
@@ -847,14 +369,14 @@ class EFDRC:
         card = reviewer.card if reviewer and reviewer.card else None
         if not card:
             return False
-        if not self._note_is_image_occlusion(card.note()):
+        if not utils.note_is_image_occlusion(card.note()):
             return False
         if self._editor_is_visible():
             self.schedule_editor_refocus(delay_ms=30)
             return True
-        if not self._card_has_any_allowed_field(card):
+        if not utils.card_has_any_allowed_field(card, self.config):
             return False
-        self.show_editor(self._fallback_field_index_for_card(card))
+        self.show_editor(utils.fallback_field_index_for_card(card, self.config))
         return True
 
     def _wrap(self, txt: str, field: str, ctx: TemplateRenderContext) -> str:
@@ -877,7 +399,7 @@ class EFDRC:
         try:
             card = ctx.card()
             if card:
-                template_name = card.template()["name"]
+                template_name = utils.template_name_for_card(card)
         except Exception:
             template_name = ""
 
@@ -887,17 +409,9 @@ class EFDRC:
         if cache_key in self._filter_cache:
             return self._wrap(txt, field, ctx) if self._filter_cache[cache_key] else txt
 
-        try:
-            model = ctx.note().model()
-            exclusions = self.config.get("exclusions", {}).get(model["name"], {})
-            if exclusions.get("disabled") or field in exclusions.get("fields", []):
-                self._filter_cache[cache_key] = False
-                return txt
-            if template_name and template_name in exclusions.get("templates", []):
-                self._filter_cache[cache_key] = False
-                return txt
-        except Exception:
-            pass
+        if not utils.field_allowed_for_card(ctx.card(), field, self.config):
+            self._filter_cache[cache_key] = False
+            return txt
 
         self._filter_cache[cache_key] = True
         return self._wrap(txt, field, ctx)
@@ -1132,8 +646,8 @@ class EFDRC:
         if self.editor_widget:
             self.editor_widget.hide()
 
-        if not self.reload_after_save:
-            self._set_review_screen_visible(True)
+        # Show reviewer immediately to reduce flicker during the save process
+        self._set_review_screen_visible(True)
 
         if not self.editor:
             self._clear_editor_state()
@@ -1152,8 +666,6 @@ class EFDRC:
         self.is_saving = False
         if self.reload_after_save:
             self.reload_reviewer()
-        else:
-            self._set_review_screen_visible(True)
         self._clear_editor_state()
 
     def reload_reviewer(self) -> None:
@@ -1172,7 +684,6 @@ class EFDRC:
                 reviewer._showQuestion()
             elif reviewer.state == "answer":
                 reviewer._showAnswer()
-        self._set_review_screen_visible(True)
 
 
 efdrc = EFDRC()

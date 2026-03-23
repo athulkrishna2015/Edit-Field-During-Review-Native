@@ -6,20 +6,22 @@ By default, all fields are editable during review. You can still use the `edit:`
 
 On normal cards, use **Ctrl + Click** (or **Cmd + Click** on Mac) on the field content to trigger the native editor.
 
-For **Image Occlusion** cards, there may not be any clickable field on the card itself. In that case, use the review screen's **Edit** button or press **E** to open the embedded editor.
+For **Image Occlusion** cards, you can **Ctrl + Click** the image, use the review screen's **Edit** button, or press **E** to open the embedded editor.
 
 ## How do I style the editable fields?
 
-When the trigger modifier is held down, editable fields are highlighted. You can customize this by adding CSS to your note type's Styling section:
+When the trigger modifier is held down, editable fields and Image Occlusion areas are highlighted. You can customize this by adding CSS to your note type's Styling section:
 
 ```css
 /* Styling for fields that can be edited */
-[data-efdrc-idx] {
+[data-efdrc-idx], #io-overlay, #io-wrapper {
     /* your styles here */
 }
 
 /* Styling specifically when the trigger modifier is active */
-.efdrc-active [data-efdrc-idx] {
+.efdrc-active [data-efdrc-idx],
+.efdrc-active #io-overlay,
+.efdrc-active #io-wrapper {
     outline: 1px dashed #0078d4;
 }
 ```
@@ -35,3 +37,7 @@ You can click the **Done** button at the top of the editor, press **Ctrl + Enter
 ## How do I undo changes inside the embedded editor?
 
 Use **Ctrl + Z** while the embedded editor is open, or click the **Undo Edit** button beside **Done**. If another add-on or a global shortcut still overrides `Ctrl+Z`, set a dedicated fallback in **Tools > Add-ons > EFDRN > Config > Custom Undo Shortcut**.
+
+## Known Issues
+
+- **Undo/Redo Stability**: We are aware that the "Undo Edit" button and the `Ctrl+Z` shortcut may be unreliable in certain configurations. We are working on a fix to ensure the editor's focus and undo stack are correctly managed.
