@@ -28,6 +28,10 @@ class EFDRC:
         self.active_card_id: Optional[int] = None
         self.is_saving = False
         self.reload_after_save = False
+        self.preload_delay_ms = 150
+        self.preload_timer = QTimer(mw)
+        self.preload_timer.setSingleShot(True)
+        qconnect(self.preload_timer.timeout, self._run_deferred_preload)
 
         self.load_config()
         self._filter_cache: Dict[str, bool] = {}
@@ -43,7 +47,7 @@ class EFDRC:
         mw.addonManager.setConfigAction(__name__, self.on_config_action)
 
         if getattr(mw, "state", None) == "review":
-            self.preload_editor()
+            self.schedule_editor_preload()
 
     def load_config(self) -> None:
         self.config = mw.addonManager.getConfig(__name__) or {
@@ -353,13 +357,15 @@ class EFDRC:
 
     def on_state_did_change(self, new_state: str, old_state: str) -> None:
         if new_state == "review":
-            self.preload_editor()
+            self.schedule_editor_preload()
             return
 
+        self.cancel_editor_preload()
         if old_state == "review" or self._editor_is_visible() or self.is_saving:
             self.hide_editor(reload=False)
 
     def on_profile_will_close(self) -> None:
+        self.cancel_editor_preload()
         self.hide_editor(reload=False)
         self._set_review_screen_visible(True)
         if self.editor:
@@ -370,11 +376,12 @@ class EFDRC:
             self.editor_widget = None
             self.editor_container = None
 
-    def on_reviewer_rendered(self, reviewer: Reviewer) -> None:
+    def on_reviewer_rendered(self, _card: Card) -> None:
         if not self._editor_is_visible():
             return
 
-        current_card_id = reviewer.card.id if reviewer.card else None
+        reviewer = getattr(mw, "reviewer", None)
+        current_card_id = reviewer.card.id if reviewer and reviewer.card else None
         if not current_card_id or current_card_id != self.active_card_id:
             self.hide_editor(reload=False)
             return
@@ -412,6 +419,29 @@ class EFDRC:
 
         self.editor = self._create_editor(fallback_note)
 
+    def cancel_editor_preload(self) -> None:
+        if self.preload_timer.isActive():
+            self.preload_timer.stop()
+
+    def schedule_editor_preload(self) -> None:
+        if getattr(mw, "state", None) != "review":
+            return
+        if self.editor or self._editor_is_visible() or self.is_saving:
+            return
+        if self.preload_timer.isActive():
+            return
+        self.preload_timer.start(self.preload_delay_ms)
+
+    def _run_deferred_preload(self) -> None:
+        if getattr(mw, "state", None) != "review":
+            return
+        if self.editor or self._editor_is_visible() or self.is_saving:
+            return
+        reviewer = getattr(mw, "reviewer", None)
+        if not reviewer or not reviewer.card:
+            return
+        self.preload_editor()
+
     def preload_editor(self) -> None:
         if getattr(mw, "state", None) != "review":
             return
@@ -442,6 +472,7 @@ class EFDRC:
         if getattr(mw, "state", None) != "review":
             tooltip("Open the reviewer before editing fields.")
             return
+        self.cancel_editor_preload()
 
         card = mw.reviewer.card
         if not card:
