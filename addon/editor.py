@@ -4,9 +4,18 @@ from typing import Any
 
 from aqt import gui_hooks
 from aqt.editor import Editor
+from aqt.qt import QShortcut
 
 
 class EmbeddedReviewerEditor(Editor):
+    def setupShortcuts(self) -> None:
+        super().setupShortcuts()
+        for child in self.widget.children():
+            if isinstance(child, QShortcut):
+                key = child.key().toString()
+                if key in ("Ctrl+Z", "Ctrl+Y", "Ctrl+Shift+Z", "Meta+Z", "Meta+Shift+Z"):
+                    child.setEnabled(False)
+
     def onBridgeCmd(self, cmd: str) -> Any:
         if not self.note:
             return

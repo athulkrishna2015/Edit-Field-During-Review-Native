@@ -451,10 +451,24 @@ class EFDRC:
     ) -> None:
         if state != "review":
             return
-        shortcuts.append(("e", self._on_review_edit_shortcut))
-        shortcuts.append(("ㄷ", self._on_review_edit_shortcut))
+        replaced_e = replaced_kr = False
+        for i, (key, fn) in enumerate(shortcuts):
+            if key == "e":
+                shortcuts[i] = (key, self._on_review_edit_shortcut)
+                replaced_e = True
+            elif key == "ㄷ":
+                shortcuts[i] = (key, self._on_review_edit_shortcut)
+                replaced_kr = True
+        
+        if not replaced_e:
+            shortcuts.append(("e", self._on_review_edit_shortcut))
+        if not replaced_kr:
+            shortcuts.append(("ㄷ", self._on_review_edit_shortcut))
 
     def _on_review_edit_shortcut(self) -> None:
+        if self._editor_is_visible():
+            self.schedule_editor_refocus()
+            return
         if self.open_image_occlusion_editor():
             return
         mw.onEditCurrent()
@@ -683,20 +697,21 @@ class EFDRC:
 
 efdrc = EFDRC()
 
-if not getattr(Reviewer.op_executed, "_efdrn_wrapped", False):
-    _efdrn_original_op_executed = Reviewer.op_executed
+if hasattr(Reviewer, "op_executed"):
+    if not getattr(Reviewer.op_executed, "_efdrn_wrapped", False):
+        _efdrn_original_op_executed = Reviewer.op_executed
 
-    def _efdrn_reviewer_op_executed(
-        reviewer: Reviewer, changes: Any, handler: object | None, focused: bool
-    ) -> bool:
-        controller = globals().get("efdrc")
-        if controller and controller.should_defer_reviewer_refresh(reviewer, changes):
-            result = _efdrn_original_op_executed(reviewer, changes, handler, False)
-            controller.schedule_editor_refocus(delay_ms=120)
-            return result
-        return _efdrn_original_op_executed(reviewer, changes, handler, focused)
+        def _efdrn_reviewer_op_executed(
+            reviewer: Reviewer, changes: Any, handler: object | None, focused: bool
+        ) -> bool:
+            controller = globals().get("efdrc")
+            if controller and controller.should_defer_reviewer_refresh(reviewer, changes):
+                result = _efdrn_original_op_executed(reviewer, changes, handler, False)
+                controller.schedule_editor_refocus(delay_ms=120)
+                return result
+            return _efdrn_original_op_executed(reviewer, changes, handler, focused)
 
-    _efdrn_reviewer_op_executed._efdrn_wrapped = True  # type: ignore[attr-defined]
-    Reviewer.op_executed = _efdrn_reviewer_op_executed
+        _efdrn_reviewer_op_executed._efdrn_wrapped = True  # type: ignore[attr-defined]
+        Reviewer.op_executed = _efdrn_reviewer_op_executed
 
 mw.addonManager.setWebExports(__name__, r"web/.*")

@@ -3,10 +3,8 @@
 from pathlib import Path
 from typing import Any, Dict
 
-from anki.config import Config
 from aqt import mw
 from aqt.utils import tooltip
-from aqt.editor import EditorMode
 from aqt.qt import *
 
 
@@ -34,13 +32,41 @@ def collect_editor_preferences() -> Dict[str, Any]:
         return prefs
 
     profile = mw.pm.profile or {}
+    
+    tags_collapsed = False
+    try:
+        from aqt.editor import EditorMode
+        tags_collapsed = mw.pm.tags_collapsed(EditorMode.EDIT_CURRENT)
+    except Exception:
+        try:
+            tags_collapsed = mw.pm.tags_collapsed()
+        except Exception:
+            pass
+
+    paste_png = False
+    paste_strips = False
+    try:
+        from anki.config import Config
+        paste_png = mw.col.get_config_bool(Config.Bool.PASTE_IMAGES_AS_PNG)
+        paste_strips = mw.col.get_config_bool(Config.Bool.PASTE_STRIPS_FORMATTING)
+    except Exception:
+        if hasattr(mw.col, "conf") and isinstance(mw.col.conf, dict):
+            paste_png = mw.col.conf.get("pastePNG", paste_png)
+            paste_strips = mw.col.conf.get("pasteStripsFormatting", paste_strips)
+        else:
+            try:
+                paste_png = mw.col.get_config("pastePNG", paste_png)
+                paste_strips = mw.col.get_config("pasteStripsFormatting", paste_strips)
+            except Exception:
+                pass
+
     prefs.update(
         {
             "last_text_color": profile.get("lastTextColor", prefs["last_text_color"]),
             "last_highlight_color": profile.get(
                 "lastHighlightColor", prefs["last_highlight_color"]
             ),
-            "tags_collapsed": mw.pm.tags_collapsed(EditorMode.EDIT_CURRENT),
+            "tags_collapsed": tags_collapsed,
             "render_mathjax": mw.col.get_config(
                 "renderMathjax", prefs["render_mathjax"]
             ),
@@ -53,12 +79,8 @@ def collect_editor_preferences() -> Dict[str, Any]:
             "custom_color_picker_palette": list(
                 mw.col.get_config("customColorPickerPalette", [])
             ),
-            "paste_images_as_png": mw.col.get_config_bool(
-                Config.Bool.PASTE_IMAGES_AS_PNG
-            ),
-            "paste_strips_formatting": mw.col.get_config_bool(
-                Config.Bool.PASTE_STRIPS_FORMATTING
-            ),
+            "paste_images_as_png": paste_png,
+            "paste_strips_formatting": paste_strips,
         }
     )
     return prefs
@@ -75,17 +97,42 @@ def apply_editor_preferences(prefs: Dict[str, Any], editor: Any = None) -> None:
             "last_highlight_color", "#ffff00"
         )
 
-    mw.pm.set_tags_collapsed(
-        EditorMode.EDIT_CURRENT, bool(prefs.get("tags_collapsed", False))
-    )
+    try:
+        from aqt.editor import EditorMode
+        mw.pm.set_tags_collapsed(
+            EditorMode.EDIT_CURRENT, bool(prefs.get("tags_collapsed", False))
+        )
+    except Exception:
+        try:
+            mw.pm.set_tags_collapsed(bool(prefs.get("tags_collapsed", False)))
+        except Exception:
+            pass
 
     def set_collection_config(key: str, value: Any) -> None:
         if mw.col.get_config(key, None) != value:
             mw.col.set_config(key, value)
 
-    def set_collection_bool_config(key: Config.Bool.V, value: bool) -> None:
-        if mw.col.get_config_bool(key) != value:
-            mw.col.set_config_bool(key, value)
+    def set_collection_bool_config(enum_attr: str, dict_key: str, value: bool) -> None:
+        try:
+            from anki.config import Config
+            if hasattr(Config, "Bool") and hasattr(Config.Bool, enum_attr):
+                key = getattr(Config.Bool, enum_attr)
+                if mw.col.get_config_bool(key) != value:
+                    mw.col.set_config_bool(key, value)
+                return
+        except Exception:
+            pass
+            
+        if hasattr(mw.col, "conf") and isinstance(mw.col.conf, dict):
+            if dict_key in mw.col.conf:
+                mw.col.conf[dict_key] = value
+                mw.col.setMod()
+                return
+        try:
+            if mw.col.get_config(dict_key, None) != value:
+                mw.col.set_config(dict_key, value)
+        except Exception:
+            pass
 
     set_collection_config("renderMathjax", bool(prefs.get("render_mathjax", True)))
     set_collection_config("shrinkEditorImages", bool(prefs.get("shrink_images", True)))
@@ -95,11 +142,11 @@ def apply_editor_preferences(prefs: Dict[str, Any], editor: Any = None) -> None:
         list(prefs.get("custom_color_picker_palette", [])),
     )
     set_collection_bool_config(
-        Config.Bool.PASTE_IMAGES_AS_PNG,
+        "PASTE_IMAGES_AS_PNG", "pastePNG",
         bool(prefs.get("paste_images_as_png", False)),
     )
     set_collection_bool_config(
-        Config.Bool.PASTE_STRIPS_FORMATTING,
+        "PASTE_STRIPS_FORMATTING", "pasteStripsFormatting",
         bool(prefs.get("paste_strips_formatting", False)),
     )
 
