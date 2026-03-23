@@ -35,12 +35,13 @@ Access the configuration via **Tools > Add-ons > EFDRN > Config**.
 - **Exclusions**: Use the tree view to disable editing for specific Note Types, Templates, or Fields. Use the **Enable All** and **Disable All** buttons for bulk management.
 - **Support Tab**: The config dialog also includes a `Support` tab with large QR codes and copy buttons for UPI, BTC, and ETH.
 
-## Recent Changes (v6.24.0)
+## Recent Changes (v7.0.0)
 
 - **Fixed Undo/Redo**: The "Undo Edit" button and shortcuts now reliably refocus the active field before executing, ensuring changes are reverted correctly.
 - **Eliminated Flicker**: The review screen now remains visible during the save transition, removing the "blank screen" jump when finishing an edit.
 - **Image Occlusion Support**: Added **Ctrl + Click** (or your custom modifier) support directly on Image Occlusion images to trigger the editor.
 - **Architectural Cleanup**: Refactored the internal code into specialized modules (`editor`, `utils`, `config`) for better stability and faster loading on newer Anki versions.
+- **Added to Tools Menu**: Quick access to configuration via `Tools > EFDRN Configuration`.
 
 ## Known Issues
 
