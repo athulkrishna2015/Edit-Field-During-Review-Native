@@ -175,7 +175,7 @@ class EFDRC:
         top_layout.addWidget(QLabel("<b>Native Field Editor</b>"))
         top_layout.addStretch()
         self.undo_btn = QPushButton("Undo Edit")
-        self.undo_btn.clicked.connect(self._on_editor_undo)
+        self.undo_btn.clicked.connect(self._on_card_restore_undo)
         top_layout.addWidget(self.undo_btn)
         self.done_btn = QPushButton("Done (Ctrl+Enter)")
         self.done_btn.clicked.connect(self.hide_editor)
