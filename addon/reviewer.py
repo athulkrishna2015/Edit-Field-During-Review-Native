@@ -38,6 +38,7 @@ class EFDRC:
         self.saved_main_undo_shortcuts: Optional[list[QKeySequence]] = None
         self.saved_main_redo_shortcuts: Optional[list[QKeySequence]] = None
         self.main_editor_pref_snapshot: Optional[Dict[str, Any]] = None
+        self.note_snapshot: Optional[Dict[str, str]] = None
         self.active_card_id: Optional[int] = None
         self.is_saving = False
         self.reload_after_save = False
@@ -120,12 +121,12 @@ class EFDRC:
         return cfg.shortcut_to_text(self.config.get("custom_undo_shortcut"))
 
     def _undo_button_tooltip(self) -> str:
-        shortcuts = ["Ctrl+Z"]
         custom_shortcut = self._configured_custom_undo_shortcut()
-        if custom_shortcut:
-            shortcuts.append(custom_shortcut)
-        shortcut_list = ", ".join(shortcuts)
-        return f"Undo the last embedded editor change ({shortcut_list})"
+        shortcuts_text = f" ({custom_shortcut})" if custom_shortcut else ""
+        return (
+            f"Restore the card to the state before editing{shortcuts_text}.\n"
+            "Use Ctrl+Z to undo individual text changes inside the editor."
+        )
 
     def _refresh_editor_controls(self) -> None:
         if self.undo_btn:
@@ -222,7 +223,7 @@ class EFDRC:
 
         self.custom_undo_shortcut = QShortcut(QKeySequence(), mw)
         self.custom_undo_shortcut.setContext(Qt.ShortcutContext.WindowShortcut)
-        qconnect(self.custom_undo_shortcut.activated, self._on_editor_undo)
+        qconnect(self.custom_undo_shortcut.activated, self._on_card_restore_undo)
 
         self.redo_shortcut = QShortcut(QKeySequence.StandardKey.Redo, mw)
         self.redo_shortcut.setContext(Qt.ShortcutContext.WindowShortcut)
@@ -321,13 +322,37 @@ class EFDRC:
             self.hide_editor()
 
     def _on_editor_undo(self) -> None:
+        """Ctrl+Z: undo a single text change inside the active editor field."""
         if not self._editor_is_visible() or not self.editor or not getattr(self.editor, "web", None):
             return
         # Ensure the webview has focus so the action is directed correctly
         self.editor.web.setFocus()
-        # Use the native QWebEnginePage action which is more robust for 
+        # Use the native QWebEnginePage action which is more robust for
         # complex web apps like Anki's editor and preserves cursor position.
         self.editor.web.triggerPageAction(QWebEnginePage.WebAction.Undo)
+
+    def _on_card_restore_undo(self) -> None:
+        """Ctrl+Alt+Z: restore the note to the snapshot taken when the editor opened."""
+        if not self._editor_is_visible() or not self.editor:
+            return
+        note = getattr(self.editor, "note", None)
+        if note is None or self.note_snapshot is None:
+            return
+        changed = False
+        for field_name, original_value in self.note_snapshot.items():
+            if field_name in note and note[field_name] != original_value:
+                note[field_name] = original_value
+                changed = True
+        if not changed:
+            tooltip("Nothing to restore – note is unchanged from when editing started.")
+            return
+        # Reload the editor UI to reflect the restored values
+        field_idx = self._active_editor_field_idx() or 0
+        card = mw.reviewer.card if mw.reviewer else None
+        if card:
+            self._set_editor_note(note, field_idx, card)
+            self.schedule_editor_refocus(field_idx, delay_ms=120)
+        tooltip("Note restored to state before editing.")
 
     def _on_editor_redo(self) -> None:
         if not self._editor_is_visible() or not self.editor or not getattr(self.editor, "web", None):
@@ -345,6 +370,7 @@ class EFDRC:
 
     def _clear_editor_state(self) -> None:
         self.active_card_id = None
+        self.note_snapshot = None
         self.reload_after_save = False
         self.pending_refocus_field_idx = None
         if self.refocus_timer.isActive():
@@ -615,6 +641,9 @@ class EFDRC:
 
         self.active_card_id = card.id
         self.reload_after_save = False
+        # Capture a snapshot of all field values before editing begins so that
+        # Ctrl+Alt+Z can restore the note to this exact state.
+        self.note_snapshot = {name: value for name, value in note.items()}
         self._suspend_main_window_undo_shortcuts()
         self._set_shortcuts_enabled(True)
         self._set_review_screen_visible(False)
