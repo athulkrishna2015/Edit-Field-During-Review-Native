@@ -22,6 +22,7 @@ from .editor import EmbeddedReviewerEditor
 
 class EFDRC:
     def __init__(self) -> None:
+        self.addon_name = mw.addonManager.addonFromModule(__name__)
         self.editor: Optional[Editor] = None
         self.editor_widget: Optional[QWidget] = None
         self.editor_container: Optional[QWidget] = None
@@ -61,7 +62,7 @@ class EFDRC:
         anki.hooks.field_filter.append(self.on_field_filter)
         gui_hooks.webview_will_set_content.append(self.on_webview_will_set_content)
 
-        mw.addonManager.setConfigAction(__name__, self.on_config_action)
+        mw.addonManager.setConfigAction(self.addon_name, self.on_config_action)
 
         # Add to Tools menu
         action = QAction("EFDRN Configuration", mw)
@@ -72,7 +73,7 @@ class EFDRC:
             self.schedule_editor_preload()
 
     def load_config(self) -> None:
-        self.config = mw.addonManager.getConfig(__name__) or {
+        self.config = mw.addonManager.getConfig(self.addon_name) or {
             "auto_enable": True,
             "show_outline": True,
             "exclusions": {},
@@ -109,7 +110,7 @@ class EFDRC:
 
         if self._should_separate_editor_preferences():
             self.config["reviewer_editor_preferences"] = cfg.collect_editor_preferences()
-            mw.addonManager.writeConfig(__name__, self.config)
+            mw.addonManager.writeConfig(self.addon_name, self.config)
 
         snapshot = self.main_editor_pref_snapshot
         self.main_editor_pref_snapshot = None
@@ -145,7 +146,7 @@ class EFDRC:
             self._filter_cache.clear()
             self._apply_shortcut_config()
 
-        cfg.on_config_action(mw.addonManager, __name__, on_save)
+        cfg.on_config_action(mw.addonManager, self.addon_name, on_save)
 
     def setup_ui(self) -> None:
         if self.editor_widget:
