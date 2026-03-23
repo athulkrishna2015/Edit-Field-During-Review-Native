@@ -8,12 +8,3 @@ This Anki add-on allows you to edit fields directly during review by embedding t
 3. The native Anki editor will appear above the card, allowing you to edit with full native support (toolbars, clozes, mathjax, etc.).
 4. Click the **Done** button (or press **Ctrl + Enter**) to save changes and return to the review.
 
-## Development
-This add-on is now simplified to use native Anki components.
-
-### Building
-To create the `.ankiaddon` file:
-```shell
-python make_ankiaddon.py
-```
-This will automatically bump the patch version and create the package.
