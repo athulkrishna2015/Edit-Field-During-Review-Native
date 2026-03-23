@@ -1,9 +1,7 @@
 This software is licensed under GNU Affero General Public License version 3 or later.
 
-Part of the code are under a different license. 
-The code in /src/addon/ts and /src/addon/web/editor is from Anki, 
-and its license can be found here: https://github.com/ankitects/anki/ 
-
+Part of the code in addon/reviewer.py is based on Anki's editor implementation,
+and its license can be found here: https://github.com/ankitects/anki/
 Copyright:
 (c) 2019 Damien Elmes
 (c) 2019 Nickolay <kelciour@gmail.com>

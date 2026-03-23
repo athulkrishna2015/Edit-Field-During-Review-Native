@@ -1,8 +1,0 @@
-{
-  "package": "edit-field-during-review-cloze",
-  "name": "Edit Field During Review (Cloze)",
-  "human_version": "6.23",
-  "conflicts": [
-    "1020366288"
-  ]
-}
