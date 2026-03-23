@@ -5,6 +5,6 @@
     "trigger_modifier": "Ctrl",
     "trigger_action": "Click",
     "custom_undo_shortcut": "Ctrl+Alt+Z",
-    "separate_editor_preferences": true,
+    "separate_editor_preferences": false,
     "reviewer_editor_preferences": {}
 }

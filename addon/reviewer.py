@@ -99,11 +99,11 @@ class EFDRC:
             "trigger_modifier": "Ctrl",
             "trigger_action": "Click",
             "custom_undo_shortcut": "Ctrl+Alt+Z",
-            "separate_editor_preferences": True,
+            "separate_editor_preferences": False,
             "reviewer_editor_preferences": {},
         }
         self.config.setdefault("custom_undo_shortcut", "Ctrl+Alt+Z")
-        self.config.setdefault("separate_editor_preferences", True)
+        self.config.setdefault("separate_editor_preferences", False)
         reviewer_prefs = self.config.setdefault("reviewer_editor_preferences", {})
         for key, value in self._default_editor_preferences().items():
             reviewer_prefs.setdefault(key, value)
@@ -125,7 +125,7 @@ class EFDRC:
         return bool(getattr(mw, "col", None) and getattr(mw, "pm", None))
 
     def _should_separate_editor_preferences(self) -> bool:
-        return bool(self.config.get("separate_editor_preferences", True))
+        return bool(self.config.get("separate_editor_preferences", False))
 
     def _collect_editor_preferences(self) -> Dict[str, Any]:
         prefs = self._default_editor_preferences()
