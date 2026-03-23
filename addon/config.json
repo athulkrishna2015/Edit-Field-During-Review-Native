@@ -3,5 +3,8 @@
     "show_outline": true,
     "exclusions": {},
     "trigger_modifier": "Ctrl",
-    "trigger_action": "Click"
+    "trigger_action": "Click",
+    "custom_undo_shortcut": "Ctrl+Alt+Z",
+    "separate_editor_preferences": true,
+    "reviewer_editor_preferences": {}
 }

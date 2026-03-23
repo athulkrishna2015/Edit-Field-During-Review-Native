@@ -2,15 +2,17 @@
 
 import inspect
 import json
+from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
 import anki
 import aqt
 from anki.cards import Card
+from anki.config import Config
 from anki.notes import Note
 from anki.template import TemplateRenderContext
 from aqt import gui_hooks, mw
-from aqt.editor import Editor
+from aqt.editor import Editor, EditorMode
 from aqt.qt import *
 from aqt.reviewer import Reviewer
 from aqt.utils import tooltip
@@ -21,10 +23,18 @@ class EFDRC:
         self.editor: Optional[Editor] = None
         self.editor_widget: Optional[QWidget] = None
         self.editor_container: Optional[QWidget] = None
+        self.undo_btn: Optional[QPushButton] = None
         self.done_btn: Optional[QPushButton] = None
         self.done_shortcut: Optional[QShortcut] = None
         self.done_shortcut_numpad: Optional[QShortcut] = None
         self.cancel_shortcut: Optional[QShortcut] = None
+        self.undo_shortcut: Optional[QShortcut] = None
+        self.custom_undo_shortcut: Optional[QShortcut] = None
+        self.redo_shortcut: Optional[QShortcut] = None
+        self.redo_alt_shortcut: Optional[QShortcut] = None
+        self.saved_main_undo_shortcuts: Optional[list[QKeySequence]] = None
+        self.saved_main_redo_shortcuts: Optional[list[QKeySequence]] = None
+        self.main_editor_pref_snapshot: Optional[Dict[str, Any]] = None
         self.active_card_id: Optional[int] = None
         self.is_saving = False
         self.reload_after_save = False
@@ -56,7 +66,274 @@ class EFDRC:
             "exclusions": {},
             "trigger_modifier": "Ctrl",
             "trigger_action": "Click",
+            "custom_undo_shortcut": "Ctrl+Alt+Z",
+            "separate_editor_preferences": True,
+            "reviewer_editor_preferences": {},
         }
+        self.config.setdefault("custom_undo_shortcut", "Ctrl+Alt+Z")
+        self.config.setdefault("separate_editor_preferences", True)
+        reviewer_prefs = self.config.setdefault("reviewer_editor_preferences", {})
+        for key, value in self._default_editor_preferences().items():
+            reviewer_prefs.setdefault(key, value)
+
+    def _default_editor_preferences(self) -> Dict[str, Any]:
+        return {
+            "last_text_color": "#0000ff",
+            "last_highlight_color": "#ffff00",
+            "tags_collapsed": False,
+            "render_mathjax": True,
+            "shrink_images": True,
+            "close_html_tags": True,
+            "custom_color_picker_palette": [],
+            "paste_images_as_png": False,
+            "paste_strips_formatting": False,
+        }
+
+    def _collection_available(self) -> bool:
+        return bool(getattr(mw, "col", None) and getattr(mw, "pm", None))
+
+    def _should_separate_editor_preferences(self) -> bool:
+        return bool(self.config.get("separate_editor_preferences", True))
+
+    def _collect_editor_preferences(self) -> Dict[str, Any]:
+        prefs = self._default_editor_preferences()
+        if not self._collection_available():
+            return prefs
+
+        profile = mw.pm.profile or {}
+        prefs.update(
+            {
+                "last_text_color": profile.get("lastTextColor", prefs["last_text_color"]),
+                "last_highlight_color": profile.get(
+                    "lastHighlightColor", prefs["last_highlight_color"]
+                ),
+                "tags_collapsed": mw.pm.tags_collapsed(EditorMode.EDIT_CURRENT),
+                "render_mathjax": mw.col.get_config(
+                    "renderMathjax", prefs["render_mathjax"]
+                ),
+                "shrink_images": mw.col.get_config(
+                    "shrinkEditorImages", prefs["shrink_images"]
+                ),
+                "close_html_tags": mw.col.get_config(
+                    "closeHTMLTags", prefs["close_html_tags"]
+                ),
+                "custom_color_picker_palette": list(
+                    mw.col.get_config("customColorPickerPalette", [])
+                ),
+                "paste_images_as_png": mw.col.get_config_bool(
+                    Config.Bool.PASTE_IMAGES_AS_PNG
+                ),
+                "paste_strips_formatting": mw.col.get_config_bool(
+                    Config.Bool.PASTE_STRIPS_FORMATTING
+                ),
+            }
+        )
+        return prefs
+
+    def _reviewer_editor_preferences(self) -> Dict[str, Any]:
+        prefs = dict(self._default_editor_preferences())
+        prefs.update(self.config.get("reviewer_editor_preferences", {}))
+        return prefs
+
+    def _set_collection_config(self, key: str, value: Any) -> None:
+        if not self._collection_available():
+            return
+        if mw.col.get_config(key, None) != value:
+            mw.col.set_config(key, value)
+
+    def _set_collection_bool_config(self, key: Config.Bool.V, value: bool) -> None:
+        if not self._collection_available():
+            return
+        if mw.col.get_config_bool(key) != value:
+            mw.col.set_config_bool(key, value)
+
+    def _apply_editor_preferences(self, prefs: Dict[str, Any]) -> None:
+        if not self._collection_available():
+            return
+
+        profile = mw.pm.profile
+        if profile is not None:
+            profile["lastTextColor"] = prefs.get("last_text_color", "#0000ff")
+            profile["lastHighlightColor"] = prefs.get(
+                "last_highlight_color", "#ffff00"
+            )
+
+        mw.pm.set_tags_collapsed(
+            EditorMode.EDIT_CURRENT, bool(prefs.get("tags_collapsed", False))
+        )
+        self._set_collection_config(
+            "renderMathjax", bool(prefs.get("render_mathjax", True))
+        )
+        self._set_collection_config(
+            "shrinkEditorImages", bool(prefs.get("shrink_images", True))
+        )
+        self._set_collection_config(
+            "closeHTMLTags", bool(prefs.get("close_html_tags", True))
+        )
+        self._set_collection_config(
+            "customColorPickerPalette",
+            list(prefs.get("custom_color_picker_palette", [])),
+        )
+        self._set_collection_bool_config(
+            Config.Bool.PASTE_IMAGES_AS_PNG,
+            bool(prefs.get("paste_images_as_png", False)),
+        )
+        self._set_collection_bool_config(
+            Config.Bool.PASTE_STRIPS_FORMATTING,
+            bool(prefs.get("paste_strips_formatting", False)),
+        )
+
+        if self.editor:
+            self.editor.setupColourPalette()
+
+    def _activate_reviewer_editor_preferences(self) -> None:
+        if not self._should_separate_editor_preferences():
+            return
+        if self.main_editor_pref_snapshot is None:
+            self.main_editor_pref_snapshot = self._collect_editor_preferences()
+        self._apply_editor_preferences(self._reviewer_editor_preferences())
+
+    def _deactivate_reviewer_editor_preferences(self) -> None:
+        if self.main_editor_pref_snapshot is None:
+            return
+
+        if self._should_separate_editor_preferences():
+            self.config["reviewer_editor_preferences"] = self._collect_editor_preferences()
+            mw.addonManager.writeConfig(__name__, self.config)
+
+        snapshot = self.main_editor_pref_snapshot
+        self.main_editor_pref_snapshot = None
+        self._apply_editor_preferences(snapshot)
+
+    def _shortcut_to_text(self, shortcut: Any) -> str:
+        if not shortcut:
+            return ""
+        return QKeySequence(str(shortcut).strip()).toString(
+            QKeySequence.SequenceFormat.PortableText
+        )
+
+    def _configured_custom_undo_shortcut(self) -> str:
+        return self._shortcut_to_text(self.config.get("custom_undo_shortcut"))
+
+    def _undo_button_tooltip(self) -> str:
+        shortcuts = ["Ctrl+Z"]
+        custom_shortcut = self._configured_custom_undo_shortcut()
+        if custom_shortcut:
+            shortcuts.append(custom_shortcut)
+        shortcut_list = ", ".join(shortcuts)
+        return f"Undo the last embedded editor change ({shortcut_list})"
+
+    def _refresh_editor_controls(self) -> None:
+        if self.undo_btn:
+            self.undo_btn.setText("Undo Edit")
+            self.undo_btn.setToolTip(self._undo_button_tooltip())
+        if self.done_btn:
+            self.done_btn.setText("Done (Ctrl+Enter)")
+
+    def _apply_shortcut_config(self) -> None:
+        if self.custom_undo_shortcut:
+            custom_shortcut = self._configured_custom_undo_shortcut()
+            self.custom_undo_shortcut.setKey(QKeySequence(custom_shortcut))
+        self._refresh_editor_controls()
+
+    def _support_entries(self) -> list[dict[str, str]]:
+        support_dir = Path(__file__).resolve().parent / "Support"
+        return [
+            {
+                "title": "UPI",
+                "value": "athulkrishnasv2015-2@okhdfcbank",
+                "image": str(support_dir / "UPI.jpg"),
+            },
+            {
+                "title": "Bitcoin (BTC)",
+                "value": "bc1qrrek3m7sr33qujjrktj949wav6mehdsk057cfx",
+                "image": str(support_dir / "BTC.jpg"),
+            },
+            {
+                "title": "Ethereum (ETH)",
+                "value": "0xce6899e4903EcB08bE5Be65E44549fadC3F45D27",
+                "image": str(support_dir / "ETH.jpg"),
+            },
+        ]
+
+    def _copy_support_value(self, value: str, label: str) -> None:
+        clipboard = QGuiApplication.clipboard()
+        if clipboard:
+            clipboard.setText(value)
+            tooltip(f"Copied {label}")
+
+    def _make_support_card(self, entry: dict[str, str]) -> QGroupBox:
+        group = QGroupBox(entry["title"])
+        layout = QVBoxLayout(group)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(10)
+
+        value_row = QHBoxLayout()
+        value_edit = QLineEdit(entry["value"])
+        value_edit.setReadOnly(True)
+        value_edit.setCursorPosition(0)
+        copy_btn = QPushButton("Copy")
+        copy_btn.clicked.connect(
+            lambda _checked=False, value=entry["value"], label=entry["title"]: (
+                self._copy_support_value(value, label)
+            )
+        )
+        value_row.addWidget(value_edit, 1)
+        value_row.addWidget(copy_btn)
+        layout.addLayout(value_row)
+
+        qr_label = QLabel()
+        qr_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        qr_label.setMinimumWidth(380)
+        qr_label.setMinimumHeight(420)
+        qr_label.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
+        )
+
+        pixmap = QPixmap(entry["image"])
+        if pixmap.isNull():
+            qr_label.setText("QR image not found.")
+        else:
+            qr_label.setPixmap(
+                pixmap.scaledToWidth(
+                    420, Qt.TransformationMode.SmoothTransformation
+                )
+            )
+
+        layout.addWidget(qr_label, 0, Qt.AlignmentFlag.AlignCenter)
+        return group
+
+    def _build_support_tab(self) -> QWidget:
+        page = QWidget()
+        page_layout = QVBoxLayout(page)
+        page_layout.setContentsMargins(0, 0, 0, 0)
+
+        support_scroll = QScrollArea()
+        support_scroll.setWidgetResizable(True)
+        support_scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
+
+        content = QWidget()
+        content_layout = QVBoxLayout(content)
+        content_layout.setContentsMargins(12, 12, 12, 12)
+        content_layout.setSpacing(12)
+
+        intro = QLabel(
+            "If this add-on helps your workflow, you can support its development "
+            "with any of the options below. Each QR code is shown large for easy "
+            "scanning, and the payment ID can be copied with one click."
+        )
+        intro.setWordWrap(True)
+        content_layout.addWidget(intro)
+
+        for entry in self._support_entries():
+            content_layout.addWidget(self._make_support_card(entry))
+
+        content_layout.addStretch()
+        support_scroll.setWidget(content)
+        page_layout.addWidget(support_scroll)
+        return page
 
     def on_config_action(self) -> None:
         self.load_config()
@@ -65,6 +342,11 @@ class EFDRC:
         dialog.setMinimumWidth(600)
         dialog.setMinimumHeight(600)
         layout = QVBoxLayout(dialog)
+        tabs = QTabWidget()
+        layout.addWidget(tabs)
+
+        settings_page = QWidget()
+        settings_layout = QVBoxLayout(settings_page)
 
         global_grp = QGroupBox("General Settings")
         grid = QGridLayout(global_grp)
@@ -84,7 +366,32 @@ class EFDRC:
         act_combo.addItems(["Click", "DoubleClick"])
         act_combo.setCurrentText(self.config.get("trigger_action", "Click"))
         grid.addWidget(act_combo, 3, 1)
-        layout.addWidget(global_grp)
+        grid.addWidget(QLabel("Custom Undo Shortcut:"), 4, 0)
+        undo_shortcut_edit = QKeySequenceEdit()
+        configured_custom_undo = self._configured_custom_undo_shortcut()
+        if configured_custom_undo:
+            undo_shortcut_edit.setKeySequence(QKeySequence(configured_custom_undo))
+        undo_shortcut_edit.setClearButtonEnabled(True)
+        grid.addWidget(undo_shortcut_edit, 4, 1)
+        separate_prefs_cb = QCheckBox(
+            "Keep reviewer editor preferences separate from Anki's main editor"
+        )
+        separate_prefs_cb.setChecked(self._should_separate_editor_preferences())
+        grid.addWidget(separate_prefs_cb, 5, 0, 1, 2)
+        undo_help = QLabel(
+            "Used by the embedded reviewer editor. Leave blank to disable the "
+            "fallback shortcut."
+        )
+        undo_help.setWordWrap(True)
+        grid.addWidget(undo_help, 6, 0, 1, 2)
+        prefs_help = QLabel(
+            "When enabled, changes to color memory, tags collapse state, MathJax, "
+            "image shrink, HTML closing, and paste options stay local to the "
+            "embedded reviewer editor."
+        )
+        prefs_help.setWordWrap(True)
+        grid.addWidget(prefs_help, 7, 0, 1, 2)
+        settings_layout.addWidget(global_grp)
 
         tree = QTreeWidget()
         tree.setHeaderLabels(["Note Type / Template / Field"])
@@ -117,7 +424,7 @@ class EFDRC:
                     in exclusions.get(model["name"], {}).get("fields", [])
                     else Qt.CheckState.Checked,
                 )
-        layout.addWidget(tree)
+        settings_layout.addWidget(tree)
 
         bulk_row = QHBoxLayout()
         enable_all_btn = QPushButton("Enable All")
@@ -125,7 +432,7 @@ class EFDRC:
         bulk_row.addWidget(enable_all_btn)
         bulk_row.addWidget(disable_all_btn)
         bulk_row.addStretch()
-        layout.addLayout(bulk_row)
+        settings_layout.addLayout(bulk_row)
 
         def set_all_items(state: Qt.CheckState) -> None:
             def apply_to_item(item: QTreeWidgetItem) -> None:
@@ -142,6 +449,9 @@ class EFDRC:
         disable_all_btn.clicked.connect(
             lambda: set_all_items(Qt.CheckState.Unchecked)
         )
+
+        tabs.addTab(settings_page, "Settings")
+        tabs.addTab(self._build_support_tab(), "Support")
 
         btns = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
@@ -180,11 +490,18 @@ class EFDRC:
                     "show_outline": outline_cb.isChecked(),
                     "trigger_modifier": mod_combo.currentText(),
                     "trigger_action": act_combo.currentText(),
+                    "custom_undo_shortcut": self._shortcut_to_text(
+                        undo_shortcut_edit.keySequence().toString(
+                            QKeySequence.SequenceFormat.PortableText
+                        )
+                    ),
+                    "separate_editor_preferences": separate_prefs_cb.isChecked(),
                     "exclusions": new_exclusions,
                 }
             )
             mw.addonManager.writeConfig(__name__, self.config)
             self._filter_cache.clear()
+            self._apply_shortcut_config()
 
     def setup_ui(self) -> None:
         if self.editor_widget:
@@ -211,6 +528,9 @@ class EFDRC:
         top_layout.setContentsMargins(10, 5, 10, 5)
         top_layout.addWidget(QLabel("<b>Native Field Editor</b>"))
         top_layout.addStretch()
+        self.undo_btn = QPushButton("Undo Edit")
+        self.undo_btn.clicked.connect(self._on_editor_undo)
+        top_layout.addWidget(self.undo_btn)
         self.done_btn = QPushButton("Done (Ctrl+Enter)")
         self.done_btn.clicked.connect(self.hide_editor)
         top_layout.addWidget(self.done_btn)
@@ -231,10 +551,12 @@ class EFDRC:
             cw_layout.insertWidget(insert_at, self.editor_widget, 1)
 
         self._install_shortcuts()
+        self._refresh_editor_controls()
         self.editor_widget.hide()
 
     def _install_shortcuts(self) -> None:
         if self.done_shortcut:
+            self._apply_shortcut_config()
             return
 
         self.done_shortcut = QShortcut(QKeySequence("Ctrl+Return"), mw)
@@ -249,6 +571,23 @@ class EFDRC:
         self.cancel_shortcut.setContext(Qt.ShortcutContext.WindowShortcut)
         qconnect(self.cancel_shortcut.activated, self._on_cancel_shortcut)
 
+        self.undo_shortcut = QShortcut(QKeySequence.StandardKey.Undo, mw)
+        self.undo_shortcut.setContext(Qt.ShortcutContext.WindowShortcut)
+        qconnect(self.undo_shortcut.activated, self._on_editor_undo)
+
+        self.custom_undo_shortcut = QShortcut(QKeySequence(), mw)
+        self.custom_undo_shortcut.setContext(Qt.ShortcutContext.WindowShortcut)
+        qconnect(self.custom_undo_shortcut.activated, self._on_editor_undo)
+
+        self.redo_shortcut = QShortcut(QKeySequence.StandardKey.Redo, mw)
+        self.redo_shortcut.setContext(Qt.ShortcutContext.WindowShortcut)
+        qconnect(self.redo_shortcut.activated, self._on_editor_redo)
+
+        self.redo_alt_shortcut = QShortcut(QKeySequence("Ctrl+Y"), mw)
+        self.redo_alt_shortcut.setContext(Qt.ShortcutContext.WindowShortcut)
+        qconnect(self.redo_alt_shortcut.activated, self._on_editor_redo)
+
+        self._apply_shortcut_config()
         self._set_shortcuts_enabled(False)
 
     def _set_shortcuts_enabled(self, enabled: bool) -> None:
@@ -256,9 +595,37 @@ class EFDRC:
             self.done_shortcut,
             self.done_shortcut_numpad,
             self.cancel_shortcut,
+            self.undo_shortcut,
+            self.custom_undo_shortcut,
+            self.redo_shortcut,
+            self.redo_alt_shortcut,
         ):
             if shortcut:
                 shortcut.setEnabled(enabled)
+
+    def _main_window_undo_actions(self) -> tuple[Optional[QAction], Optional[QAction]]:
+        form = getattr(mw, "form", None)
+        if not form:
+            return (None, None)
+        return (getattr(form, "actionUndo", None), getattr(form, "actionRedo", None))
+
+    def _suspend_main_window_undo_shortcuts(self) -> None:
+        undo_action, redo_action = self._main_window_undo_actions()
+        if undo_action and self.saved_main_undo_shortcuts is None:
+            self.saved_main_undo_shortcuts = list(undo_action.shortcuts())
+            undo_action.setShortcuts([])
+        if redo_action and self.saved_main_redo_shortcuts is None:
+            self.saved_main_redo_shortcuts = list(redo_action.shortcuts())
+            redo_action.setShortcuts([])
+
+    def _restore_main_window_undo_shortcuts(self) -> None:
+        undo_action, redo_action = self._main_window_undo_actions()
+        if undo_action and self.saved_main_undo_shortcuts is not None:
+            undo_action.setShortcuts(self.saved_main_undo_shortcuts)
+            self.saved_main_undo_shortcuts = None
+        if redo_action and self.saved_main_redo_shortcuts is not None:
+            redo_action.setShortcuts(self.saved_main_redo_shortcuts)
+            self.saved_main_redo_shortcuts = None
 
     def _on_done_shortcut(self) -> None:
         if self._editor_is_visible():
@@ -267,6 +634,20 @@ class EFDRC:
     def _on_cancel_shortcut(self) -> None:
         if self._editor_is_visible():
             self.hide_editor()
+
+    def _on_editor_undo(self) -> None:
+        if not self._editor_is_visible() or not self.editor or not getattr(self.editor, "web", None):
+            return
+        self.editor.web.setFocus()
+        self.editor.web.triggerPageAction(QWebEnginePage.WebAction.Undo)
+        self.editor.web.eval("document.execCommand('undo');")
+
+    def _on_editor_redo(self) -> None:
+        if not self._editor_is_visible() or not self.editor or not getattr(self.editor, "web", None):
+            return
+        self.editor.web.setFocus()
+        self.editor.web.triggerPageAction(QWebEnginePage.WebAction.Redo)
+        self.editor.web.eval("document.execCommand('redo');")
 
     def _editor_is_visible(self) -> bool:
         return bool(self.editor_widget and not self.editor_widget.isHidden())
@@ -279,6 +660,8 @@ class EFDRC:
     def _clear_editor_state(self) -> None:
         self.active_card_id = None
         self.reload_after_save = False
+        if self.undo_btn:
+            self.undo_btn.setEnabled(False)
         if self.done_btn:
             self.done_btn.setEnabled(True)
 
@@ -367,6 +750,7 @@ class EFDRC:
     def on_profile_will_close(self) -> None:
         self.cancel_editor_preload()
         self.hide_editor(reload=False)
+        self._deactivate_reviewer_editor_preferences()
         self._set_review_screen_visible(True)
         if self.editor:
             self.editor.cleanup()
@@ -446,8 +830,13 @@ class EFDRC:
         if getattr(mw, "state", None) != "review":
             return
 
+        self._activate_reviewer_editor_preferences()
         note = mw.reviewer.card.note() if mw.reviewer.card else None
-        self._ensure_editor_ready(note)
+        try:
+            self._ensure_editor_ready(note)
+        finally:
+            if not self._editor_is_visible():
+                self._deactivate_reviewer_editor_preferences()
         if self.editor_widget:
             self.editor_widget.hide()
 
@@ -480,22 +869,29 @@ class EFDRC:
             return
 
         note = card.note()
+        self._activate_reviewer_editor_preferences()
         self._ensure_editor_ready(note)
         if not self.editor or not self.editor_widget:
             tooltip("Editor could not be initialized.")
+            self._deactivate_reviewer_editor_preferences()
             return
 
         self.active_card_id = card.id
         self.reload_after_save = False
+        self._suspend_main_window_undo_shortcuts()
         self._set_shortcuts_enabled(True)
         self._set_review_screen_visible(False)
         self.editor_widget.show()
         self._set_editor_note(note, field_idx, card)
+        if self.undo_btn:
+            self.undo_btn.setEnabled(True)
         if self.done_btn:
             self.done_btn.setEnabled(True)
 
     def hide_editor(self, reload: bool = True) -> None:
         self.reload_after_save = reload and getattr(mw, "state", None) == "review"
+        self._restore_main_window_undo_shortcuts()
+        self._deactivate_reviewer_editor_preferences()
 
         if not self._editor_is_visible():
             if not self.reload_after_save:
@@ -505,6 +901,8 @@ class EFDRC:
             return
 
         self._set_shortcuts_enabled(False)
+        if self.undo_btn:
+            self.undo_btn.setEnabled(False)
         if self.done_btn:
             self.done_btn.setEnabled(False)
         if self.editor_widget:
