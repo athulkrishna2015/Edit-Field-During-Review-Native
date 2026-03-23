@@ -45,7 +45,7 @@ Access the configuration via **Tools > Add-ons > EFDRN > Config**.
 
 ## Known Issues
 
-- **Undo Reliability**: The "Undo Edit" button and the `Ctrl+Z` shortcut inside the embedded editor may still be inconsistent on some systems or Anki versions. We are investigating a more robust fix for the editor's internal undo stack.
+- **Undo Reliability**: While we have switched to more robust native methods to prevent cursor jumping and to support formatting changes (like Bold), the undo stack can still be inconsistent in certain complex editing scenarios or when multiple fields are modified rapidly. We are working on a more seamless fix for the editor's internal history.
 
 ## Credits & License
 

@@ -322,20 +322,17 @@ class EFDRC:
     def _on_editor_undo(self) -> None:
         if not self._editor_is_visible() or not self.editor or not getattr(self.editor, "web", None):
             return
+        # Ensure the webview has focus so the action is directed correctly
         self.editor.web.setFocus()
-        self.editor.web.eval(
-            "if (typeof focusField !== 'undefined' && typeof currentField !== 'undefined') "
-            "{ focusField(currentField); } document.execCommand('undo');"
-        )
+        # Use the native QWebEnginePage action which is more robust for 
+        # complex web apps like Anki's editor and preserves cursor position.
+        self.editor.web.triggerPageAction(QWebEnginePage.WebAction.Undo)
 
     def _on_editor_redo(self) -> None:
         if not self._editor_is_visible() or not self.editor or not getattr(self.editor, "web", None):
             return
         self.editor.web.setFocus()
-        self.editor.web.eval(
-            "if (typeof focusField !== 'undefined' && typeof currentField !== 'undefined') "
-            "{ focusField(currentField); } document.execCommand('redo');"
-        )
+        self.editor.web.triggerPageAction(QWebEnginePage.WebAction.Redo)
 
     def _editor_is_visible(self) -> bool:
         return bool(self.editor_widget and not self.editor_widget.isHidden())

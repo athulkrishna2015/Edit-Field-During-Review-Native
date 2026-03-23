@@ -40,4 +40,4 @@ Use **Ctrl + Z** while the embedded editor is open, or click the **Undo Edit** b
 
 ## Known Issues
 
-- **Undo/Redo Stability**: We are aware that the "Undo Edit" button and the `Ctrl+Z` shortcut may be unreliable in certain configurations. We are working on a fix to ensure the editor's focus and undo stack are correctly managed.
+- **Undo/Redo Stability**: We've improved the undo/redo functionality to fix cursor jumping and formatting issues (like bolding), but it may still be inconsistent in very complex editing scenarios. We are continuing to refine the integration with Anki's internal editor history.
