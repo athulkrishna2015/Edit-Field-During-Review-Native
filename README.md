@@ -35,7 +35,7 @@ Access the configuration via **Tools > Add-ons > EFDRN > Config**.
 - **Exclusions**: Use the tree view to disable editing for specific Note Types, Templates, or Fields. Use the **Enable All** and **Disable All** buttons for bulk management.
 - **Support Tab**: The config dialog also includes a `Support` tab with large QR codes and copy buttons for UPI, BTC, and ETH.
 
-## Recent Changes (23 March 2026)
+## Recent Changes (23/03/2026)
 
 - **Fixed Undo/Redo**: The "Undo Edit" button and shortcuts now reliably refocus the active field before executing, ensuring changes are reverted correctly.
 - **Eliminated Flicker**: The review screen now remains visible during the save transition, removing the "blank screen" jump when finishing an edit.
