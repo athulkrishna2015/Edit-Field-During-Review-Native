@@ -1,5 +1,7 @@
 {
     "auto_enable": true,
     "show_outline": true,
-    "exclusions": {}
+    "exclusions": {},
+    "trigger_modifier": "Ctrl",
+    "trigger_action": "Click"
 }

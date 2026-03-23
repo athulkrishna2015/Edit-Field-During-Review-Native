@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 
 import base64
-from typing import Any, Optional, Tuple, Union
+import time
+import json
+from typing import Any, Optional, Tuple, Union, Dict
 
 import anki
 from anki.template import TemplateRenderContext
@@ -12,20 +14,20 @@ from aqt import mw, gui_hooks
 from aqt.editor import Editor
 from aqt.qt import *
 from aqt.utils import tooltip
-
-class EFDRCEditor(Editor):
-    def onBridgeCmd(self, cmd: str) -> None:
-        super().onBridgeCmd(cmd)
+from aqt.reviewer import Reviewer
+from aqt.browser.previewer import MultiCardPreviewer
 
 class EFDRC:
     def __init__(self):
-        self.editor: Optional[EFDRCEditor] = None
+        self.editor: Optional[Editor] = None
         self.editor_widget: Optional[QWidget] = None
         self.editor_parent: Optional[QWidget] = None
         self.current_note_id: Optional[int] = None
         self.done_btn: Optional[QPushButton] = None
+        self.is_saving = False
         
         self.load_config()
+        self._filter_cache: Dict[str, bool] = {}
         
         gui_hooks.webview_did_receive_js_message.append(self.on_js_message)
         gui_hooks.reviewer_did_show_question.append(lambda reviewer: self.hide_editor())
@@ -39,251 +41,222 @@ class EFDRC:
         self.config = mw.addonManager.getConfig(__name__) or {
             "auto_enable": True,
             "show_outline": True,
-            "exclusions": {}
+            "exclusions": {},
+            "trigger_modifier": "Ctrl",
+            "trigger_action": "Click"
         }
 
     def on_config_action(self):
         self.load_config()
         dialog = QDialog(mw)
         dialog.setWindowTitle("EFDRN Configuration")
-        dialog.setMinimumWidth(500)
-        dialog.setMinimumHeight(600)
+        dialog.setMinimumWidth(600)
+        dialog.setMinimumHeight(700)
         layout = QVBoxLayout(dialog)
         
-        # Global settings
-        global_grp = QGroupBox("Global Settings")
-        global_layout = QVBoxLayout(global_grp)
+        global_grp = QGroupBox("General Settings")
+        global_layout = QGridLayout(global_grp)
         
         auto_cb = QCheckBox("Enable by default for all fields")
         auto_cb.setChecked(self.config.get("auto_enable", True))
-        global_layout.addWidget(auto_cb)
+        global_layout.addWidget(auto_cb, 0, 0, 1, 2)
         
-        outline_cb = QCheckBox("Show outline on Ctrl + Hover")
+        outline_cb = QCheckBox("Show visual outline on Hover")
         outline_cb.setChecked(self.config.get("show_outline", True))
-        global_layout.addWidget(outline_cb)
-        
+        global_layout.addWidget(outline_cb, 1, 0, 1, 2)
+
+        global_layout.addWidget(QLabel("Trigger Modifier:"), 2, 0)
+        mod_combo = QComboBox()
+        mod_combo.addItems(["Ctrl", "Shift", "Alt", "None"])
+        mod_combo.setCurrentText(self.config.get("trigger_modifier", "Ctrl"))
+        global_layout.addWidget(mod_combo, 2, 1)
+
+        global_layout.addWidget(QLabel("Trigger Action:"), 3, 0)
+        action_combo = QComboBox()
+        action_combo.addItems(["Click", "DoubleClick"])
+        action_combo.setCurrentText(self.config.get("trigger_action", "Click"))
+        global_layout.addWidget(action_combo, 3, 1)
+
         layout.addWidget(global_grp)
         
-        # Note types customization
-        layout.addWidget(QLabel("<b>Enable/Disable Note Types, Templates, and Fields:</b>"))
+        tools_layout = QHBoxLayout()
+        sel_all = QPushButton("Enable All")
+        sel_none = QPushButton("Disable All")
+        tools_layout.addWidget(sel_all)
+        tools_layout.addWidget(sel_none)
+        tools_layout.addStretch()
+        layout.addLayout(tools_layout)
+        
         tree = QTreeWidget()
-        tree.setHeaderLabels(["Name", "Type"])
-        tree.setColumnCount(2)
-        tree.setColumnWidth(0, 300)
-        
+        tree.setHeaderLabels(["Note Type / Template / Field"])
         exclusions = self.config.get("exclusions", {})
-        
-        models = mw.col.models.all()
-        for model in models:
+        for model in mw.col.models.all():
             nt_name = model['name']
-            nt_ex = exclusions.get(nt_name, {})
+            ex = exclusions.get(nt_name, {})
+            nt_item = QTreeWidgetItem(tree, [nt_name])
+            nt_item.setCheckState(0, Qt.CheckState.Unchecked if ex.get("disabled") else Qt.CheckState.Checked)
             
-            nt_item = QTreeWidgetItem(tree, [nt_name, "Note Type"])
-            nt_item.setCheckState(0, Qt.CheckState.Unchecked if nt_ex.get("disabled") else Qt.CheckState.Checked)
-            nt_item.setExpanded(False)
-            
-            # Templates
-            tmpl_root = QTreeWidgetItem(nt_item, ["Templates", ""])
+            t_root = QTreeWidgetItem(nt_item, ["Templates (Card Types)"])
             for tmpl in model['tmpls']:
-                t_name = tmpl['name']
-                t_item = QTreeWidgetItem(tmpl_root, [t_name, "Template"])
-                t_item.setCheckState(0, Qt.CheckState.Unchecked if t_name in nt_ex.get("templates", []) else Qt.CheckState.Checked)
+                t_item = QTreeWidgetItem(t_root, [tmpl['name']])
+                t_item.setCheckState(0, Qt.CheckState.Unchecked if tmpl['name'] in ex.get("templates", []) else Qt.CheckState.Checked)
             
-            # Fields
-            fld_root = QTreeWidgetItem(nt_item, ["Fields", ""])
+            f_root = QTreeWidgetItem(nt_item, ["Fields"])
             for fld in model['flds']:
-                f_name = fld['name']
-                f_item = QTreeWidgetItem(fld_root, [f_name, "Field"])
-                f_item.setCheckState(0, Qt.CheckState.Unchecked if f_name in nt_ex.get("fields", []) else Qt.CheckState.Checked)
+                f_item = QTreeWidgetItem(f_root, [fld['name']])
+                f_item.setCheckState(0, Qt.CheckState.Unchecked if fld['name'] in ex.get("fields", []) else Qt.CheckState.Checked)
 
         layout.addWidget(tree)
         
+        def set_all(state):
+            it = QTreeWidgetItemIterator(tree)
+            while it.value():
+                it.value().setCheckState(0, state)
+                it += 1
+        
+        sel_all.clicked.connect(lambda: set_all(Qt.CheckState.Checked))
+        sel_none.clicked.connect(lambda: set_all(Qt.CheckState.Unchecked))
+
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(dialog.accept)
         buttons.rejected.connect(dialog.reject)
         layout.addWidget(buttons)
         
         if dialog.exec():
-            # Save configuration
-            new_exclusions = {}
+            new_ex = {}
             for i in range(tree.topLevelItemCount()):
                 nt_item = tree.topLevelItem(i)
                 nt_name = nt_item.text(0)
-                
-                nt_disabled = nt_item.checkState(0) == Qt.CheckState.Unchecked
-                
-                tmpl_root = nt_item.child(0)
-                disabled_tmpls = []
-                for j in range(tmpl_root.childCount()):
-                    t_item = tmpl_root.child(j)
-                    if t_item.checkState(0) == Qt.CheckState.Unchecked:
-                        disabled_tmpls.append(t_item.text(0))
-                
-                fld_root = nt_item.child(1)
-                disabled_flds = []
-                for j in range(fld_root.childCount()):
-                    f_item = fld_root.child(j)
-                    if f_item.checkState(0) == Qt.CheckState.Unchecked:
-                        disabled_flds.append(f_item.text(0))
-                
-                if nt_disabled or disabled_tmpls or disabled_flds:
-                    new_exclusions[nt_name] = {
-                        "disabled": nt_disabled,
-                        "templates": disabled_tmpls,
-                        "fields": disabled_flds
-                    }
+                disabled = nt_item.checkState(0) == Qt.CheckState.Unchecked
+                t_root, f_root = nt_item.child(0), nt_item.child(1)
+                d_tmpls = [t_root.child(j).text(0) for j in range(t_root.childCount()) if t_root.child(j).checkState(0) == Qt.CheckState.Unchecked]
+                d_flds = [f_root.child(j).text(0) for j in range(f_root.childCount()) if f_root.child(j).checkState(0) == Qt.CheckState.Unchecked]
+                if disabled or d_tmpls or d_flds:
+                    new_ex[nt_name] = {"disabled": disabled, "templates": d_tmpls, "fields": d_flds}
             
-            self.config["auto_enable"] = auto_cb.isChecked()
-            self.config["show_outline"] = outline_cb.isChecked()
-            self.config["exclusions"] = new_exclusions
+            self.config.update({
+                "auto_enable": auto_cb.isChecked(),
+                "show_outline": outline_cb.isChecked(),
+                "trigger_modifier": mod_combo.currentText(),
+                "trigger_action": action_combo.currentText(),
+                "exclusions": new_ex
+            })
             mw.addonManager.writeConfig(__name__, self.config)
-            tooltip("Config saved. Please reload the reviewer to apply changes.")
+            self._filter_cache.clear()
+            tooltip("Settings saved.")
 
     def setup_ui(self):
-        if self.editor_widget:
-            return
-        
+        if self.editor_widget: return
         self.editor_widget = QWidget(mw.centralWidget())
+        self.editor_widget.setMinimumHeight(350)
         layout = QVBoxLayout(self.editor_widget)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
-        
         top_bar = QWidget()
+        top_bar.setObjectName("EFDRN_TopBar")
+        top_bar.setStyleSheet("QWidget#EFDRN_TopBar { border-bottom: 1px solid #aaa; background: palette(window); }")
         top_layout = QHBoxLayout(top_bar)
-        top_layout.setContentsMargins(5, 5, 5, 5)
-        
-        title = QLabel("<b>Edit Field</b>")
-        top_layout.addWidget(title)
-        
+        top_layout.setContentsMargins(10, 4, 10, 4)
+        top_layout.addWidget(QLabel("<b>Native Field Editor</b>"))
         top_layout.addStretch()
-        
-        self.done_btn = QPushButton("Done")
-        self.done_btn.setShortcut("Ctrl+Return")
+        self.done_btn = QPushButton("Done (Ctrl+Enter)")
         self.done_btn.clicked.connect(self.hide_editor)
         top_layout.addWidget(self.done_btn)
-        
         layout.addWidget(top_bar)
-        
         self.editor_parent = QWidget()
-        editor_parent_layout = QVBoxLayout(self.editor_parent)
-        editor_parent_layout.setContentsMargins(0, 0, 0, 0)
+        vbox = QVBoxLayout(self.editor_parent)
+        vbox.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self.editor_parent)
-        
-        mw.centralWidget().layout().insertWidget(1, self.editor_widget)
+        cw_layout = mw.centralWidget().layout()
+        if cw_layout:
+            idx = cw_layout.indexOf(mw.reviewer.web)
+            cw_layout.insertWidget(max(0, idx), self.editor_widget)
         self.editor_widget.hide()
 
-    def wrap_field(self, txt: str, field: str, ctx: TemplateRenderContext) -> str:
-        try:
-            note = ctx.note()
-            model = note.model()
-            fld_idx = 0
-            for i, f in enumerate(model['flds']):
-                if f['name'] == field:
-                    fld_idx = i
-                    break
-            return f'<span data-efdrc-idx="{fld_idx}">{txt}</span>'
-        except:
-            return txt
-
     def on_field_filter(self, txt: str, field: str, filt: str, ctx: TemplateRenderContext) -> str:
-        # Explicit 'edit:' filter always enabled
-        if filt == "edit":
-            return self.wrap_field(txt, field, ctx)
-            
-        # If auto_enable is false, skip unless explicitly using 'edit:'
-        if not self.config.get("auto_enable", True):
-            return txt
-            
-        # Skip if any other filter is applied (e.g. {{cloze:Field}}, {{text:Field}}, etc.)
-        if filt:
-            return txt
-
-        # Check for exclusions
+        if filt == "edit": return self._wrap(txt, field, ctx)
+        if not self.config.get("auto_enable", True) or filt: return txt
+        cache_key = f"{ctx.note().model()['name']}_{field}_{filt}"
+        if cache_key in self._filter_cache:
+            return self._wrap(txt, field, ctx) if self._filter_cache[cache_key] else txt
         try:
-            note = ctx.note()
-            model = note.model()
-            nt_name = model['name']
-            
-            exclusions = self.config.get("exclusions", {})
-            if nt_name in exclusions:
-                nt_ex = exclusions[nt_name]
-                if nt_ex.get("disabled", False):
+            model = ctx.note().model()
+            ex = self.config.get("exclusions", {}).get(model['name'], {})
+            if ex.get("disabled") or field in ex.get("fields", []):
+                self._filter_cache[cache_key] = False
+                return txt
+            try:
+                if ctx.card() and ctx.card().template()['name'] in ex.get("templates", []):
+                    self._filter_cache[cache_key] = False
                     return txt
-                if field in nt_ex.get("fields", []):
-                    return txt
-                
-                # Check current card template
-                # ctx.card() might not be available in all contexts, but is for Reviewer
-                try:
-                    card = ctx.card()
-                    if card:
-                        tmpl_name = card.template()['name']
-                        if tmpl_name in nt_ex.get("templates", []):
-                            return txt
-                except:
-                    pass
-        except:
-            pass
-        
-        return self.wrap_field(txt, field, ctx)
+            except: pass
+        except: pass
+        self._filter_cache[cache_key] = True
+        return self._wrap(txt, field, ctx)
+
+    def _wrap(self, txt: str, field: str, ctx: TemplateRenderContext) -> str:
+        try:
+            idx = next((i for i, f in enumerate(ctx.note().model()['flds']) if f['name'] == field), 0)
+            return f'<span data-efdrc-idx="{idx}">{txt}</span>'
+        except: return txt
 
     def on_webview_will_set_content(self, web_content: aqt.webview.WebContent, context: Optional[Any]) -> None:
-        if isinstance(context, aqt.reviewer.Reviewer):
+        if isinstance(context, (Reviewer, MultiCardPreviewer)):
+            self._filter_cache.clear()
             addon_package = mw.addonManager.addonFromModule(__name__)
             web_content.js.append(f"/_addons/{addon_package}/web/efdrc.js")
             if self.config.get("show_outline", True):
                 web_content.css.append(f"/_addons/{addon_package}/web/efdrc.css")
+            js_conf = {
+                "modifier": self.config.get("trigger_modifier", "Ctrl"),
+                "action": self.config.get("trigger_action", "Click")
+            }
+            web_content.body += f"<script>EFDRC.setup({json.dumps(js_conf)});</script>"
 
     def on_js_message(self, handled: Tuple[bool, Any], message: str, context: Any) -> Tuple[bool, Any]:
-        if message.startswith("EFDRC!edit#"):
-            if not isinstance(context, aqt.reviewer.Reviewer):
-                return handled
-            try:
-                idx = int(message.split("#")[1])
-                self.show_editor(idx)
-            except Exception as e:
-                tooltip(f"Error opening editor: {e}")
+        if message.startswith("EFDRC!edit#") and isinstance(context, (Reviewer, MultiCardPreviewer)):
+            try: self.show_editor(int(message.split("#")[1]))
+            except Exception as e: tooltip(f"Error: {e}")
             return (True, None)
         return handled
 
     def show_editor(self, field_idx: int):
+        if self.is_saving: return
         self.setup_ui()
         note = mw.reviewer.card.note()
-        
+        self.editor_widget.show()
         if self.editor and self.current_note_id != note.id:
             self.editor.cleanup()
             self.editor = None
-            
         if not self.editor:
-            self.editor = EFDRCEditor(mw, self.editor_parent, note)
+            self.editor = Editor(mw, self.editor_parent, note)
             self.current_note_id = note.id
-        
         self.editor.loadNote(field_idx)
-        self.editor_widget.show()
-        if self.done_btn:
-            self.done_btn.setEnabled(True)
+        if self.done_btn: self.done_btn.setEnabled(True)
 
     def hide_editor(self):
         if self.editor_widget and not self.editor_widget.isHidden():
-            if self.done_btn:
-                self.done_btn.setEnabled(False)
+            self.is_saving = True
+            if self.done_btn: self.done_btn.setEnabled(False)
             self.editor_widget.hide()
-            if self.editor:
-                self.editor.saveNow(self.reload_reviewer)
-            else:
-                self.reload_reviewer()
+            if self.editor: self.editor.saveNow(self._on_save_done)
+            else: self._on_save_done()
+
+    def _on_save_done(self):
+        self.is_saving = False
+        self.reload_reviewer()
 
     def reload_reviewer(self):
         reviewer = mw.reviewer
-        if not reviewer or not reviewer.card:
-            return
-            
-        reviewer.card = mw.col.getCard(reviewer.card.id)
-        
-        if reviewer.state == "question":
-            reviewer._showQuestion()
-        elif reviewer.state == "answer":
-            reviewer._showAnswer()
+        if reviewer and reviewer.card:
+            t = getattr(reviewer.card, "timer_started", getattr(reviewer.card, "timerStarted", None))
+            reviewer.card = mw.col.getCard(reviewer.card.id)
+            if t is not None:
+                if hasattr(reviewer.card, "timer_started"): reviewer.card.timer_started = t
+                else: reviewer.card.timerStarted = t
+            if reviewer.state == "question": reviewer._showQuestion()
+            elif reviewer.state == "answer": reviewer._showAnswer()
+        if hasattr(mw, "previewer") and mw.previewer: mw.previewer.render_card()
 
 efdrc = EFDRC()
 mw.addonManager.setWebExports(__name__, r"web/.*")

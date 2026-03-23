@@ -1,7 +1,7 @@
-.efdrc-ctrl [data-efdrc-idx] {
+.efdrc-active [data-efdrc-idx] {
     outline: 1px dashed #0078d4;
     cursor: pointer;
 }
-.efdrc-ctrl [data-efdrc-idx]:hover {
+.efdrc-active [data-efdrc-idx]:hover {
     background-color: rgba(0, 120, 212, 0.1);
 }

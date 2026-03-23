@@ -1,12 +1,25 @@
 (function() {
     window.EFDRC = {
-        setup: function() {
-            document.addEventListener('click', function(event) {
-                if (event.ctrlKey) {
-                    var el = event.target;
+        config: {
+            modifier: 'Ctrl',
+            action: 'Click'
+        },
+        setup: function(conf) {
+            if (conf) this.config = conf;
+            
+            const handleTrigger = (event) => {
+                const modifierMap = {
+                    'Ctrl': event.ctrlKey || event.metaKey,
+                    'Shift': event.shiftKey,
+                    'Alt': event.altKey,
+                    'None': true
+                };
+                
+                if (modifierMap[this.config.modifier]) {
+                    let el = event.target;
                     while (el && el !== document.body) {
                         if (el.hasAttribute('data-efdrc-idx')) {
-                            var idx = el.getAttribute('data-efdrc-idx');
+                            const idx = el.getAttribute('data-efdrc-idx');
                             window.pycmd('EFDRC!edit#' + idx);
                             event.preventDefault();
                             event.stopPropagation();
@@ -15,15 +28,25 @@
                         el = el.parentElement;
                     }
                 }
-            }, true);
+            };
 
-            window.addEventListener('keydown', function(e) {
-                if (e.key === 'Control') document.body.classList.add('efdrc-ctrl');
-            });
-            window.addEventListener('keyup', function(e) {
-                if (e.key === 'Control') document.body.classList.remove('efdrc-ctrl');
-            });
+            const eventType = this.config.action === 'DoubleClick' ? 'dblclick' : 'click';
+            document.addEventListener(eventType, handleTrigger, true);
+
+            const updateActiveState = (e, isDown) => {
+                const keys = { 'Ctrl': 'Control', 'Shift': 'Shift', 'Alt': 'Alt' };
+                if (this.config.modifier === 'None') {
+                    document.body.classList.add('efdrc-active');
+                } else if (e.key === keys[this.config.modifier]) {
+                    if (isDown) document.body.classList.add('efdrc-active');
+                    else document.body.classList.remove('efdrc-active');
+                }
+            };
+
+            window.addEventListener('keydown', (e) => updateActiveState(e, true));
+            window.addEventListener('keyup', (e) => updateActiveState(e, false));
+            
+            if (this.config.modifier === 'None') document.body.classList.add('efdrc-active');
         }
     };
-    EFDRC.setup();
 })();
