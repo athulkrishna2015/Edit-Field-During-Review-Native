@@ -47,7 +47,7 @@ def resolve_build_version(
 
 def create_ankiaddon(explicit_version: str | None = None) -> int:
     # Get the project root and addon directory
-    root_dir = Path.cwd()
+    root_dir = Path(__file__).resolve().parent
     addon_path = root_dir / ADDON_DIR
 
     if not addon_path.exists():

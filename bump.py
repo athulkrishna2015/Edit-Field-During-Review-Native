@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 
 VERSION_RE = re.compile(r"^\d+\.\d+\.\d+$")
+SHORT_VERSION_RE = re.compile(r"^\d+\.\d+$")
 BUMP_PART_ALIASES = {
     "major": "major",
     "minor": "minor",
@@ -13,12 +14,20 @@ BUMP_PART_ALIASES = {
 }
 
 
+def normalize_version(version_string: str) -> str:
+    version = (version_string or "").strip()
+    if SHORT_VERSION_RE.fullmatch(version):
+        return f"{version}.0"
+    return version
+
+
 def validate_version(version_string: str) -> str:
-    if not VERSION_RE.fullmatch(version_string):
+    normalized = normalize_version(version_string)
+    if not VERSION_RE.fullmatch(normalized):
         raise ValueError(
             f"Invalid version '{version_string}'. Expected format: major.minor.patch"
         )
-    return version_string
+    return normalized
 
 
 def sync_version(version_string: str, addon_root: Path) -> None:

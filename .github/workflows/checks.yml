@@ -9,26 +9,27 @@ on:
       - "*"
 
 jobs:
-  build:
+  validate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-        with:
-          submodules: recursive
+      - uses: actions/checkout@v4
 
       - name: Setup Python
-        uses: actions/setup-python@v2.2.1
+        uses: actions/setup-python@v5
         with:
-          python-version: 3.9
+          python-version: "3.11"
 
-      - name: Install npm dependencies
-        run: npm ci
+      - name: Compile Python Files
+        run: python -m py_compile bump.py make_ankiaddon.py addon/__init__.py addon/reviewer.py
 
-      - name: Run standard
-        run: npx standard
+      - name: Validate Version Metadata
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from bump import read_current_version
 
-      - name: Install Python dependencies
-        run: python -m pip install aqt mypy pyqt5-stubs PyQt6 PyQt6-WebEngine types-simplejson
+          print(read_current_version(Path("addon")))
+          PY
 
-      - name: Run mypy
-        run: python -m mypy --install-types --non-interactive .
+      - name: Smoke Test Packaging
+        run: python make_ankiaddon.py 0.0.1

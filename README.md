@@ -9,15 +9,14 @@ This Anki add-on allows you to edit fields directly during review by embedding t
 - **Seamless Integration**: The editor appears above your card content without opening a new window, preserving your review context.
 - **Granular Control**: Enable or disable editing for specific **Note Types**, **Templates (Card Types)**, or **Fields** via a simple tree-view configuration.
 - **Customizable Triggers**: Choose your preferred trigger modifier (Ctrl, Shift, Alt, or None) and action (Click or DoubleClick).
-- **Browser Preview Support**: Edit fields directly from the Browser's preview pane.
 - **Fast & Reliable**: Uses native components for maximum performance and compatibility with other add-ons.
 
 ## 🚀 How to Use
 
-1. **Trigger the Editor**: During review (or in the Browser Preview), use the default trigger: **Ctrl + Click** (or **Cmd + Click** on Mac) on the field content.
+1. **Trigger the Editor**: During review, use the default trigger: **Ctrl + Click** (or **Cmd + Click** on Mac) on the field content.
 2. **Visual Feedback**: When holding your trigger modifier (e.g., Ctrl), editable fields will show a dashed outline on hover.
 3. **Edit Your Content**: The native editor will appear above the card. All standard Anki editor shortcuts and toolbar buttons are available.
-4. **Save and Close**: Click the **Done** button or press **Ctrl + Enter** to save your changes and return to the review immediately.
+4. **Save and Close**: Click the **Done** button, press **Ctrl + Enter**, or press **Esc** to save your changes and return to the review immediately.
 
 ## ⚙️ Configuration
 
@@ -29,16 +28,7 @@ Access the configuration via **Tools > Add-ons > EFDRN > Config**.
 - **Trigger Action**: Choose between `Click` or `DoubleClick`.
 - **Exclusions**: Use the tree view to disable editing for specific Note Types, Templates, or Fields. Use the **Enable All** and **Disable All** buttons for bulk management.
 
-## 🛠️ Development
-
-This add-on is simplified to use native Anki components and requires no external build steps.
-
-### Building
-To create the `.ankiaddon` package:
-```shell
-python make_ankiaddon.py
-```
-This will automatically bump the patch version and generate a timestamped `.ankiaddon` file in the root directory.
+Development, build, and release notes live in [DEVELOPMENT.md](DEVELOPMENT.md).
 
 ## 📜 Credits & License
 - Refactored version of "Edit Field During Review (Cloze)".

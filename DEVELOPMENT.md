@@ -17,8 +17,8 @@ This repository contains the source for the **Edit Field During Review (Native)*
 
 - Reviewer field filter: converts `{{edit:Field}}` into a span with data attributes.
 - Reviewer WebView: injected JS/CSS to handle Ctrl+Click and visual feedback.
-- Native Editor: When a field is Ctrl-clicked, a native Anki `Editor` is initialized and embedded above the card.
-- Done button: Saves changes via `editor.saveNow()` and refreshes the reviewer.
+- Native Editor: When a field is Ctrl-clicked, a native Anki `Editor` is preloaded and then embedded into the reviewer area.
+- Close controls: Done button, `Ctrl+Enter`, and `Esc` all save changes and return to review.
 
 ## Versioning Scheme
 
@@ -78,6 +78,11 @@ Output naming format:
 ```text
 Edit_Field_During_Review_Native_v<major.minor.patch>_<YYYYMMDDHHMM>.ankiaddon
 ```
+
+## Automation
+
+- `.github/workflows/checks.yml`: compiles the Python files, validates version metadata, and smoke-tests packaging with an explicit version.
+- `.github/workflows/create_release.yml`: builds a release artifact with an explicit version, commits `addon/manifest.json` and `addon/VERSION`, tags the release, and uploads the generated `.ankiaddon`.
 
 ## Local Testing With Symlink
 
