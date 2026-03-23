@@ -18,6 +18,33 @@ from aqt.reviewer import Reviewer
 from aqt.utils import tooltip
 
 
+class EmbeddedReviewerEditor(Editor):
+    def onBridgeCmd(self, cmd: str) -> Any:
+        if not self.note:
+            return
+
+        if cmd.startswith("key"):
+            (_type, ord_str, nid_str, txt) = cmd.split(":", 3)
+            ord_idx = int(ord_str)
+            try:
+                nid = int(nid_str)
+            except ValueError:
+                nid = 0
+            if nid != self.note.id:
+                return
+
+            try:
+                self.note.fields[ord_idx] = self.mungeHTML(txt)
+            except IndexError:
+                return
+
+            gui_hooks.editor_did_fire_typing_timer(self.note)
+            self._check_and_update_duplicate_display_async()
+            return
+
+        return super().onBridgeCmd(cmd)
+
+
 class EFDRC:
     def __init__(self) -> None:
         self.editor: Optional[Editor] = None
@@ -38,10 +65,14 @@ class EFDRC:
         self.active_card_id: Optional[int] = None
         self.is_saving = False
         self.reload_after_save = False
+        self.pending_refocus_field_idx: Optional[int] = None
         self.preload_delay_ms = 150
         self.preload_timer = QTimer(mw)
         self.preload_timer.setSingleShot(True)
         qconnect(self.preload_timer.timeout, self._run_deferred_preload)
+        self.refocus_timer = QTimer(mw)
+        self.refocus_timer.setSingleShot(True)
+        qconnect(self.refocus_timer.timeout, self._restore_editor_focus)
 
         self.load_config()
         self._filter_cache: Dict[str, bool] = {}
@@ -49,6 +80,7 @@ class EFDRC:
         gui_hooks.webview_did_receive_js_message.append(self.on_js_message)
         gui_hooks.reviewer_did_show_question.append(self.on_reviewer_rendered)
         gui_hooks.reviewer_did_show_answer.append(self.on_reviewer_rendered)
+        gui_hooks.state_shortcuts_will_change.append(self.on_state_shortcuts_will_change)
         gui_hooks.state_did_change.append(self.on_state_did_change)
         gui_hooks.profile_will_close.append(self.on_profile_will_close)
         anki.hooks.field_filter.append(self.on_field_filter)
@@ -603,6 +635,46 @@ class EFDRC:
             if shortcut:
                 shortcut.setEnabled(enabled)
 
+    def _active_editor_field_idx(self) -> Optional[int]:
+        if not self.editor:
+            return None
+        current_idx = getattr(self.editor, "currentField", None)
+        if current_idx is not None:
+            return current_idx
+        return getattr(self.editor, "last_field_index", None)
+
+    def schedule_editor_refocus(
+        self, field_idx: Optional[int] = None, delay_ms: int = 75
+    ) -> None:
+        if field_idx is None:
+            field_idx = self._active_editor_field_idx()
+        self.pending_refocus_field_idx = field_idx
+        if self.refocus_timer.isActive():
+            self.refocus_timer.stop()
+        self.refocus_timer.start(delay_ms)
+
+    def _restore_editor_focus(self) -> None:
+        if (
+            not self._editor_is_visible()
+            or not self.editor
+            or not getattr(self.editor, "web", None)
+            or getattr(mw, "state", None) != "review"
+        ):
+            return
+
+        field_idx = self.pending_refocus_field_idx
+        if field_idx is None:
+            field_idx = self._active_editor_field_idx()
+        self.pending_refocus_field_idx = None
+
+        self.editor.web.setFocus()
+        if field_idx is None:
+            return
+
+        self.editor.web.eval(
+            f'require("anki/ui").loaded.then(() => {{ focusField({field_idx}); }});'
+        )
+
     def _main_window_undo_actions(self) -> tuple[Optional[QAction], Optional[QAction]]:
         form = getattr(mw, "form", None)
         if not form:
@@ -660,10 +732,130 @@ class EFDRC:
     def _clear_editor_state(self) -> None:
         self.active_card_id = None
         self.reload_after_save = False
+        self.pending_refocus_field_idx = None
+        if self.refocus_timer.isActive():
+            self.refocus_timer.stop()
         if self.undo_btn:
             self.undo_btn.setEnabled(False)
         if self.done_btn:
             self.done_btn.setEnabled(True)
+
+    def _template_name_for_card(self, card: Card) -> str:
+        try:
+            template = card.template()
+            return template["name"] if template else ""
+        except Exception:
+            return ""
+
+    def _note_is_image_occlusion(self, note: Note) -> bool:
+        kind = note.model().get("originalStockKind")
+        if hasattr(kind, "name"):
+            kind = kind.name
+        if kind == "ORIGINAL_STOCK_KIND_IMAGE_OCCLUSION":
+            return True
+        try:
+            return int(kind) == 6
+        except (TypeError, ValueError):
+            return False
+
+    def _field_allowed_for_card(self, card: Card, field_name: str) -> bool:
+        try:
+            model = card.note().model()
+            exclusions = self.config.get("exclusions", {}).get(model["name"], {})
+            if exclusions.get("disabled"):
+                return False
+            if field_name in exclusions.get("fields", []):
+                return False
+            template_name = self._template_name_for_card(card)
+            if template_name and template_name in exclusions.get("templates", []):
+                return False
+        except Exception:
+            return True
+        return True
+
+    def _field_index_by_name(self, note: Note, field_name: str) -> Optional[int]:
+        for idx, field in enumerate(note.model()["flds"]):
+            if field["name"] == field_name:
+                return idx
+        return None
+
+    def _card_has_any_allowed_field(self, card: Card) -> bool:
+        for field in card.note().model()["flds"]:
+            if self._field_allowed_for_card(card, field["name"]):
+                return True
+        return False
+
+    def _fallback_field_index_for_card(self, card: Card) -> int:
+        note = card.note()
+        model_fields = note.model()["flds"]
+
+        if self._note_is_image_occlusion(note):
+            io_fields = None
+            try:
+                io_fields = mw.backend.get_image_occlusion_fields(note.mid)
+            except Exception:
+                io_fields = None
+
+            preferred_indices = []
+            if io_fields is not None:
+                for attr in ("header", "back_extra", "comments"):
+                    idx = getattr(io_fields, attr, None)
+                    if idx is not None:
+                        preferred_indices.append(int(idx))
+
+            if not preferred_indices:
+                for field_name in ("Header", "Back Extra", "Comments"):
+                    idx = self._field_index_by_name(note, field_name)
+                    if idx is not None:
+                        preferred_indices.append(idx)
+
+            skipped_indices = set()
+            if io_fields is not None:
+                for attr in ("occlusions", "image"):
+                    idx = getattr(io_fields, attr, None)
+                    if idx is not None:
+                        skipped_indices.add(int(idx))
+
+            for idx in preferred_indices:
+                if 0 <= idx < len(model_fields):
+                    field_name = model_fields[idx]["name"]
+                    if self._field_allowed_for_card(card, field_name):
+                        return idx
+
+            for idx, field in enumerate(model_fields):
+                if idx in skipped_indices:
+                    continue
+                if self._field_allowed_for_card(card, field["name"]):
+                    return idx
+
+        for idx, field in enumerate(model_fields):
+            if self._field_allowed_for_card(card, field["name"]):
+                return idx
+
+        return 0
+
+    def open_editor_for_current_card(self) -> bool:
+        reviewer = getattr(mw, "reviewer", None)
+        card = reviewer.card if reviewer and reviewer.card else None
+        if not card:
+            return False
+        self.show_editor(self._fallback_field_index_for_card(card))
+        return True
+
+    def open_image_occlusion_editor(self) -> bool:
+        reviewer = getattr(mw, "reviewer", None)
+        card = reviewer.card if reviewer and reviewer.card else None
+        if not card:
+            return False
+        if not self._note_is_image_occlusion(card.note()):
+            return False
+        if self._editor_is_visible():
+            self.schedule_editor_refocus(delay_ms=30)
+            return True
+        if not self._card_has_any_allowed_field(card):
+            return False
+        self.show_editor(self._fallback_field_index_for_card(card))
+        return True
 
     def _wrap(self, txt: str, field: str, ctx: TemplateRenderContext) -> str:
         try:
@@ -730,6 +922,12 @@ class EFDRC:
     def on_js_message(
         self, handled: Tuple[bool, Any], message: str, context: Any
     ) -> Tuple[bool, Any]:
+        if (
+            message == "edit"
+            and isinstance(context, Reviewer)
+            and self.open_image_occlusion_editor()
+        ):
+            return (True, None)
         if message.startswith("EFDRC!edit#") and isinstance(context, Reviewer):
             try:
                 self.show_editor(int(message.split("#")[1]))
@@ -737,6 +935,19 @@ class EFDRC:
                 tooltip(f"Error: {exc}")
             return (True, None)
         return handled
+
+    def on_state_shortcuts_will_change(
+        self, state: str, shortcuts: list[tuple[str, Any]]
+    ) -> None:
+        if state != "review":
+            return
+        shortcuts.append(("e", self._on_review_edit_shortcut))
+        shortcuts.append(("ㄷ", self._on_review_edit_shortcut))
+
+    def _on_review_edit_shortcut(self) -> None:
+        if self.open_image_occlusion_editor():
+            return
+        mw.onEditCurrent()
 
     def on_state_did_change(self, new_state: str, old_state: str) -> None:
         if new_state == "review":
@@ -773,6 +984,18 @@ class EFDRC:
         # Reviewer redraws can happen while editing the same note; keep the
         # card hidden so the editor stays visually in control.
         self._set_review_screen_visible(False)
+        self.schedule_editor_refocus()
+
+    def should_defer_reviewer_refresh(self, reviewer: Reviewer, changes: Any) -> bool:
+        current_card = getattr(reviewer, "card", None)
+        current_card_id = current_card.id if current_card else None
+        return bool(
+            self._editor_is_visible()
+            and not self.is_saving
+            and current_card_id
+            and current_card_id == self.active_card_id
+            and getattr(changes, "note_text", False)
+        )
 
     def _editor_uses_parent_window(self) -> bool:
         try:
@@ -788,9 +1011,9 @@ class EFDRC:
             kwargs = {}
             if editor_mode is not None and hasattr(editor_mode, "EDIT_CURRENT"):
                 kwargs["editor_mode"] = editor_mode.EDIT_CURRENT
-            return Editor(mw, self.editor_container, mw, **kwargs)
+            return EmbeddedReviewerEditor(mw, self.editor_container, mw, **kwargs)
 
-        return Editor(mw, self.editor_container, note)
+        return EmbeddedReviewerEditor(mw, self.editor_container, note)
 
     def _ensure_editor_ready(self, note: Optional[Note] = None) -> None:
         self.setup_ui()
@@ -883,6 +1106,7 @@ class EFDRC:
         self._set_review_screen_visible(False)
         self.editor_widget.show()
         self._set_editor_note(note, field_idx, card)
+        self.schedule_editor_refocus(field_idx, delay_ms=120)
         if self.undo_btn:
             self.undo_btn.setEnabled(True)
         if self.done_btn:
@@ -952,4 +1176,21 @@ class EFDRC:
 
 
 efdrc = EFDRC()
+
+if not getattr(Reviewer.op_executed, "_efdrn_wrapped", False):
+    _efdrn_original_op_executed = Reviewer.op_executed
+
+    def _efdrn_reviewer_op_executed(
+        reviewer: Reviewer, changes: Any, handler: object | None, focused: bool
+    ) -> bool:
+        controller = globals().get("efdrc")
+        if controller and controller.should_defer_reviewer_refresh(reviewer, changes):
+            result = _efdrn_original_op_executed(reviewer, changes, handler, False)
+            controller.schedule_editor_refocus(delay_ms=120)
+            return result
+        return _efdrn_original_op_executed(reviewer, changes, handler, focused)
+
+    _efdrn_reviewer_op_executed._efdrn_wrapped = True  # type: ignore[attr-defined]
+    Reviewer.op_executed = _efdrn_reviewer_op_executed
+
 mw.addonManager.setWebExports(__name__, r"web/.*")

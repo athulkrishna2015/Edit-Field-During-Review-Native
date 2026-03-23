@@ -4,11 +4,13 @@
 
 By default, all fields are editable during review. You can still use the `edit:` filter for explicit control, but it is optional. If you have disabled auto-enable in the add-on config, update your template fields to use `{{edit:FieldName}}`.
 
-Note that you must **Ctrl + Click** (or **Cmd + Click** on Mac) on the field content to trigger the native editor.
+On normal cards, use **Ctrl + Click** (or **Cmd + Click** on Mac) on the field content to trigger the native editor.
+
+For **Image Occlusion** cards, there may not be any clickable field on the card itself. In that case, use the review screen's **Edit** button or press **E** to open the embedded editor.
 
 ## How do I style the editable fields?
 
-When the Ctrl key is held down, editable fields are highlighted. You can customize this by adding CSS to your note type's Styling section:
+When the trigger modifier is held down, editable fields are highlighted. You can customize this by adding CSS to your note type's Styling section:
 
 ```css
 /* Styling for fields that can be edited */
@@ -24,8 +26,12 @@ When the Ctrl key is held down, editable fields are highlighted. You can customi
 
 ## Can I use the editor's shortcuts?
 
-Yes! Since this add-on embeds the native Anki editor, all standard editor shortcuts (like `Ctrl+Shift+C` for clozes or `Ctrl+B` for bold) work exactly as they do in the main editor window.
+Yes. Since this add-on embeds the native Anki editor, standard editor shortcuts like `Ctrl+Shift+C` for clozes or `Ctrl+B` for bold work the same way they do in the main editor window.
 
 ## How do I close the editor?
 
 You can click the **Done** button at the top of the editor, press **Ctrl + Enter**, or press **Esc** to save and return to your review.
+
+## How do I undo changes inside the embedded editor?
+
+Use **Ctrl + Z** while the embedded editor is open, or click the **Undo Edit** button beside **Done**. If another add-on or a global shortcut still overrides `Ctrl+Z`, set a dedicated fallback in **Tools > Add-ons > EFDRN > Config > Custom Undo Shortcut**.
