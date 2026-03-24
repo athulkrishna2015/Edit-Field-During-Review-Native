@@ -22,9 +22,7 @@ This Anki add-on allows you to edit fields directly during review by embedding t
 5. **Undo While Editing**: Use **Ctrl + Z** while the embedded editor is open, or click the **Undo Edit** button beside **Done**. If another add-on or a global shortcut still grabs `Ctrl+Z`, set a dedicated fallback shortcut in the add-on config.
 6. **Save and Close**: Click the **Done** button, press **Ctrl + Enter**, or press **Esc** to save your changes and return to review immediately.
 
-
-https://github.com/user-attachments/assets/55093f86-431e-4851-b90f-ddd33b4f58f2
-
+![demo](https://github.com/user-attachments/assets/1e27d7d1-4b82-44c3-a38e-00e8d62acbd3)
 
 ## Configuration
 
