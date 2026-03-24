@@ -1,6 +1,7 @@
-# Edit Field During Review (Native) [EFDRN]
+# [Edit Field During Review (Native) [EFDRN]](https://github.com/athulkrishna2015/Edit-Field-During-Review-Native)
 
 This Anki add-on allows you to edit fields directly during review by embedding the native Anki editor into the review window.
+Install from [anki web](https://ankiweb.net/shared/info/2117554822)
 
 ## Features
 
