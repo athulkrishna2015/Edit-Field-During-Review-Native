@@ -1,10 +1,13 @@
 # -*- coding: utf-8 -*-
 
+import re
 from typing import Optional
 
 from anki.cards import Card
 from anki.notes import Note
 from aqt import mw
+
+_FIELD_REPLACEMENT_RE = re.compile(r"{{([^{}]+)}}")
 
 
 def note_is_image_occlusion(note: Note) -> bool:
@@ -34,16 +37,56 @@ def template_name_for_card(card: Card) -> str:
         return ""
 
 
+def _stable_model_exclusion(model: dict, config: dict) -> dict:
+    exclusions = config.get("exclusions_v2", {})
+    model_id = str(model.get("id", ""))
+    entry = exclusions.get(model_id, {})
+    return entry if isinstance(entry, dict) else {}
+
+
+def _legacy_model_exclusion(model: dict, config: dict) -> dict:
+    exclusions = config.get("exclusions", {})
+    entry = exclusions.get(model.get("name", ""), {})
+    return entry if isinstance(entry, dict) else {}
+
+
+def note_type_disabled(model: dict, config: dict) -> bool:
+    stable = _stable_model_exclusion(model, config)
+    if stable:
+        return bool(stable.get("disabled"))
+    return bool(_legacy_model_exclusion(model, config).get("disabled"))
+
+
+def template_disabled(model: dict, template: dict, config: dict) -> bool:
+    stable = _stable_model_exclusion(model, config)
+    if stable:
+        return template.get("ord") in stable.get("templates", [])
+    return template.get("name") in _legacy_model_exclusion(model, config).get(
+        "templates", []
+    )
+
+
+def field_disabled(model: dict, field: dict, config: dict) -> bool:
+    stable = _stable_model_exclusion(model, config)
+    if stable:
+        return field.get("ord") in stable.get("fields", [])
+    return field.get("name") in _legacy_model_exclusion(model, config).get(
+        "fields", []
+    )
+
+
 def field_allowed_for_card(card: Card, field_name: str, config: dict) -> bool:
     try:
         model = card.note().model()
-        exclusions = config.get("exclusions", {}).get(model["name"], {})
-        if exclusions.get("disabled"):
+        if note_type_disabled(model, config):
             return False
-        if field_name in exclusions.get("fields", []):
+        field_idx = field_index_by_name(card.note(), field_name)
+        if field_idx is not None and field_disabled(
+            model, model["flds"][field_idx], config
+        ):
             return False
-        template_name = template_name_for_card(card)
-        if template_name and template_name in exclusions.get("templates", []):
+        template = card.template()
+        if template and template_disabled(model, template, config):
             return False
     except Exception:
         return True
@@ -105,3 +148,27 @@ def fallback_field_index_for_card(card: Card, config: dict) -> int:
             return idx
 
     return 0
+
+
+def add_edit_filter_to_template(template_html: str, field_names: set[str]) -> str:
+    def replace(match: re.Match[str]) -> str:
+        inner = match.group(1).strip()
+        if not inner or inner[0] in "#/^":
+            return match.group(0)
+
+        parts = [part.strip() for part in inner.split(":")]
+        if not parts:
+            return match.group(0)
+
+        field_name = parts[-1]
+        filters = parts[:-1]
+        if field_name not in field_names:
+            return match.group(0)
+        if any(filter_name.lower() == "edit" for filter_name in filters):
+            return match.group(0)
+        if any(filter_name.lower().startswith("type") for filter_name in filters):
+            return match.group(0)
+
+        return "{{" + ":".join(["edit", *parts]) + "}}"
+
+    return _FIELD_REPLACEMENT_RE.sub(replace, template_html)

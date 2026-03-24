@@ -2,11 +2,7 @@ name: checks
 
 on:
   push:
-    branches:
-      - "*"
   pull_request:
-    branches:
-      - "*"
 
 jobs:
   validate:
@@ -20,7 +16,7 @@ jobs:
           python-version: "3.11"
 
       - name: Compile Python Files
-        run: python -m py_compile bump.py make_ankiaddon.py addon/__init__.py addon/reviewer.py
+        run: python -m compileall -q bump.py make_ankiaddon.py addon
 
       - name: Validate Version Metadata
         run: |

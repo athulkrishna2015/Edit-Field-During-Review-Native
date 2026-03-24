@@ -16,8 +16,7 @@
     background-color: rgba(0, 120, 212, 0.1);
 }
 
-.efdrc-active .efdrc-empty:empty::after,
-.efdrc-active [data-efdrc-idx].efdrc-empty:not(:has(*)):not(:has(text))::after {
+.efdrc-active [data-efdrc-idx].efdrc-empty::after {
     content: " [empty field] ";
     opacity: 0.6;
     font-size: 0.85em;

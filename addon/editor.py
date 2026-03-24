@@ -35,6 +35,7 @@ class EmbeddedReviewerEditor(Editor):
             except IndexError:
                 return
 
+            self.last_field_index = self.currentField = ord_idx
             gui_hooks.editor_did_fire_typing_timer(self.note)
             self._check_and_update_duplicate_display_async()
             return

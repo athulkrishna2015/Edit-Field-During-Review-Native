@@ -2,7 +2,7 @@
 
 ## I can't edit the cards while reviewing!
 
-By default, all fields are editable during review. You can still use the `edit:` filter for explicit control, but it is optional. If you have disabled auto-enable in the add-on config, update your template fields to use `{{edit:FieldName}}`.
+By default, note fields rendered during review are editable. You can still use the `edit:` filter for explicit control, but it is optional. If you have disabled auto-enable in the add-on config, update your template fields to use `{{edit:FieldName}}`.
 
 On normal cards, use **Ctrl + Click** (or **Cmd + Click** on Mac) on the field content to trigger the native editor.
 
@@ -36,7 +36,7 @@ You can click the **Done** button at the top of the editor, press **Ctrl + Enter
 
 ## How do I undo changes inside the embedded editor?
 
-Use **Ctrl + Z** while the embedded editor is open, or click the **Undo Edit** button beside **Done**. If another add-on or a global shortcut still overrides `Ctrl+Z`, set a dedicated fallback in **Tools > Add-ons > EFDRN > Config > Custom Undo Shortcut**.
+Use **Ctrl + Z** while the embedded editor is open for native editor undo/redo.
 
 ## Known Issues
 

@@ -7,6 +7,13 @@ from aqt import mw
 from aqt.utils import tooltip
 from aqt.qt import *
 
+from . import utils
+
+
+MODEL_ID_ROLE = int(Qt.ItemDataRole.UserRole)
+ENTRY_KIND_ROLE = int(Qt.ItemDataRole.UserRole) + 1
+ENTRY_ORD_ROLE = int(Qt.ItemDataRole.UserRole) + 2
+
 
 def default_editor_preferences() -> Dict[str, Any]:
     return {
@@ -296,7 +303,7 @@ def on_config_action(addon_manager: Any, module_name: str, on_save: Any) -> None
     act_combo.addItems(["Click", "DoubleClick"])
     act_combo.setCurrentText(config.get("trigger_action", "Click"))
     grid.addWidget(act_combo, 3, 1)
-    grid.addWidget(QLabel("Custom Undo Shortcut:"), 4, 0)
+    grid.addWidget(QLabel("Fallback Shortcut:"), 4, 0)
     undo_shortcut_edit = QKeySequenceEdit()
     configured_custom_undo = shortcut_to_text(config.get("custom_undo_shortcut"))
     if configured_custom_undo:
@@ -309,8 +316,8 @@ def on_config_action(addon_manager: Any, module_name: str, on_save: Any) -> None
     separate_prefs_cb.setChecked(config.get("separate_editor_preferences", False))
     grid.addWidget(separate_prefs_cb, 5, 0, 1, 2)
     undo_help = QLabel(
-        "Used by the embedded reviewer editor. Leave blank to disable the "
-        "fallback shortcut."
+        "Optional shortcut used by the embedded reviewer editor. Leave blank "
+        "to disable the fallback shortcut."
     )
     undo_help.setWordWrap(True)
     grid.addWidget(undo_help, 6, 0, 1, 2)
@@ -325,33 +332,43 @@ def on_config_action(addon_manager: Any, module_name: str, on_save: Any) -> None
 
     tree = QTreeWidget()
     tree.setHeaderLabels(["Note Type / Template / Field"])
-    exclusions = config.get("exclusions", {})
     for model in mw.col.models.all():
         nt_item = QTreeWidgetItem(tree, [model["name"]])
+        model_id = str(model["id"])
+        nt_item.setData(0, MODEL_ID_ROLE, model_id)
+        nt_item.setData(0, ENTRY_KIND_ROLE, "model")
         nt_item.setCheckState(
             0,
             Qt.CheckState.Unchecked
-            if exclusions.get(model["name"], {}).get("disabled")
+            if utils.note_type_disabled(model, config)
             else Qt.CheckState.Checked,
         )
         t_root = QTreeWidgetItem(nt_item, ["Templates"])
+        t_root.setData(0, MODEL_ID_ROLE, model_id)
+        t_root.setData(0, ENTRY_KIND_ROLE, "templates_root")
         for template in model["tmpls"]:
             t_item = QTreeWidgetItem(t_root, [template["name"]])
+            t_item.setData(0, MODEL_ID_ROLE, model_id)
+            t_item.setData(0, ENTRY_KIND_ROLE, "template")
+            t_item.setData(0, ENTRY_ORD_ROLE, int(template.get("ord", -1)))
             t_item.setCheckState(
                 0,
                 Qt.CheckState.Unchecked
-                if template["name"]
-                in exclusions.get(model["name"], {}).get("templates", [])
+                if utils.template_disabled(model, template, config)
                 else Qt.CheckState.Checked,
             )
         f_root = QTreeWidgetItem(nt_item, ["Fields"])
+        f_root.setData(0, MODEL_ID_ROLE, model_id)
+        f_root.setData(0, ENTRY_KIND_ROLE, "fields_root")
         for field in model["flds"]:
             f_item = QTreeWidgetItem(f_root, [field["name"]])
+            f_item.setData(0, MODEL_ID_ROLE, model_id)
+            f_item.setData(0, ENTRY_KIND_ROLE, "field")
+            f_item.setData(0, ENTRY_ORD_ROLE, int(field.get("ord", -1)))
             f_item.setCheckState(
                 0,
                 Qt.CheckState.Unchecked
-                if field["name"]
-                in exclusions.get(model["name"], {}).get("fields", [])
+                if utils.field_disabled(model, field, config)
                 else Qt.CheckState.Checked,
             )
     settings_layout.addWidget(tree)
@@ -392,8 +409,10 @@ def on_config_action(addon_manager: Any, module_name: str, on_save: Any) -> None
 
     if dialog.exec():
         new_exclusions = {}
+        new_exclusions_v2 = {}
         for idx in range(tree.topLevelItemCount()):
             note_type_item = tree.topLevelItem(idx)
+            model_id = str(note_type_item.data(0, MODEL_ID_ROLE) or "")
             disabled = note_type_item.checkState(0) == Qt.CheckState.Unchecked
             disabled_templates = [
                 note_type_item.child(0).child(child_idx).text(0)
@@ -401,17 +420,39 @@ def on_config_action(addon_manager: Any, module_name: str, on_save: Any) -> None
                 if note_type_item.child(0).child(child_idx).checkState(0)
                 == Qt.CheckState.Unchecked
             ]
+            disabled_template_ords = [
+                int(note_type_item.child(0).child(child_idx).data(0, ENTRY_ORD_ROLE))
+                for child_idx in range(note_type_item.child(0).childCount())
+                if note_type_item.child(0).child(child_idx).checkState(0)
+                == Qt.CheckState.Unchecked
+                and note_type_item.child(0).child(child_idx).data(0, ENTRY_ORD_ROLE)
+                is not None
+            ]
             disabled_fields = [
                 note_type_item.child(1).child(child_idx).text(0)
                 for child_idx in range(note_type_item.child(1).childCount())
                 if note_type_item.child(1).child(child_idx).checkState(0)
                 == Qt.CheckState.Unchecked
             ]
+            disabled_field_ords = [
+                int(note_type_item.child(1).child(child_idx).data(0, ENTRY_ORD_ROLE))
+                for child_idx in range(note_type_item.child(1).childCount())
+                if note_type_item.child(1).child(child_idx).checkState(0)
+                == Qt.CheckState.Unchecked
+                and note_type_item.child(1).child(child_idx).data(0, ENTRY_ORD_ROLE)
+                is not None
+            ]
             if disabled or disabled_templates or disabled_fields:
                 new_exclusions[note_type_item.text(0)] = {
                     "disabled": disabled,
                     "templates": disabled_templates,
                     "fields": disabled_fields,
+                }
+            if model_id and (disabled or disabled_template_ords or disabled_field_ords):
+                new_exclusions_v2[model_id] = {
+                    "disabled": disabled,
+                    "templates": disabled_template_ords,
+                    "fields": disabled_field_ords,
                 }
 
         config.update(
@@ -427,6 +468,7 @@ def on_config_action(addon_manager: Any, module_name: str, on_save: Any) -> None
                 ),
                 "separate_editor_preferences": separate_prefs_cb.isChecked(),
                 "exclusions": new_exclusions,
+                "exclusions_v2": new_exclusions_v2,
             }
         )
         addon_manager.writeConfig(module_name, config)

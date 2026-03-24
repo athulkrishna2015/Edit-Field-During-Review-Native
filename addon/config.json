@@ -2,6 +2,7 @@
     "auto_enable": true,
     "show_outline": true,
     "exclusions": {},
+    "exclusions_v2": {},
     "trigger_modifier": "Ctrl",
     "trigger_action": "Click",
     "custom_undo_shortcut": "Ctrl+Alt+Z",

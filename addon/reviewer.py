@@ -5,10 +5,12 @@ import json
 from typing import Any, Dict, Optional, Tuple
 
 import anki
+import anki.template
 import aqt
 from anki.cards import Card
 from anki.notes import Note
 from anki.template import TemplateRenderContext
+from anki.utils import to_json_bytes
 from aqt import gui_hooks, mw
 from aqt.editor import Editor
 from aqt.qt import *
@@ -31,6 +33,9 @@ class EFDRC:
         self.done_shortcut: Optional[QShortcut] = None
         self.done_shortcut_numpad: Optional[QShortcut] = None
         self.cancel_shortcut: Optional[QShortcut] = None
+        self.undo_shortcut: Optional[QShortcut] = None
+        self.redo_shortcut: Optional[QShortcut] = None
+        self.redo_alt_shortcut: Optional[QShortcut] = None
         self.custom_undo_shortcut: Optional[QShortcut] = None
         self.saved_main_undo_shortcuts: Optional[list[QKeySequence]] = None
         self.saved_main_redo_shortcuts: Optional[list[QKeySequence]] = None
@@ -75,6 +80,7 @@ class EFDRC:
             "auto_enable": True,
             "show_outline": True,
             "exclusions": {},
+            "exclusions_v2": {},
             "trigger_modifier": "Ctrl",
             "trigger_action": "Click",
             "custom_undo_shortcut": "Ctrl+Alt+Z",
@@ -83,6 +89,7 @@ class EFDRC:
         }
         self.config.setdefault("custom_undo_shortcut", "Ctrl+Alt+Z")
         self.config.setdefault("separate_editor_preferences", True)
+        self.config.setdefault("exclusions_v2", {})
         reviewer_prefs = self.config.setdefault("reviewer_editor_preferences", {})
         for key, value in cfg.default_editor_preferences().items():
             reviewer_prefs.setdefault(key, value)
@@ -162,7 +169,7 @@ class EFDRC:
         top_layout.addStretch()
 
         self.done_btn = QPushButton("Done (Ctrl+Enter)")
-        self.done_btn.clicked.connect(self.hide_editor)
+        self.done_btn.clicked.connect(lambda _checked=False: self.hide_editor())
         top_layout.addWidget(self.done_btn)
         layout.addWidget(top_bar)
 
@@ -201,9 +208,19 @@ class EFDRC:
         self.cancel_shortcut.setContext(Qt.ShortcutContext.WindowShortcut)
         qconnect(self.cancel_shortcut.activated, self._on_cancel_shortcut)
 
-        # Ctrl+Alt+Z: full card restore (configured shortcut).
-        # Ctrl+Z / Ctrl+Y are NOT intercepted — they flow to the webview so
-        # the browser's native undo/redo handles text AND formatting changes.
+        self.undo_shortcut = QShortcut(QKeySequence.StandardKey.Undo, mw)
+        self.undo_shortcut.setContext(Qt.ShortcutContext.WindowShortcut)
+        qconnect(self.undo_shortcut.activated, self._on_editor_undo)
+
+        self.redo_shortcut = QShortcut(QKeySequence.StandardKey.Redo, mw)
+        self.redo_shortcut.setContext(Qt.ShortcutContext.WindowShortcut)
+        qconnect(self.redo_shortcut.activated, self._on_editor_redo)
+
+        self.redo_alt_shortcut = QShortcut(QKeySequence("Ctrl+Y"), mw)
+        self.redo_alt_shortcut.setContext(Qt.ShortcutContext.WindowShortcut)
+        qconnect(self.redo_alt_shortcut.activated, self._on_editor_redo)
+
+        # Optional fallback shortcut for resetting the note snapshot.
         self.custom_undo_shortcut = QShortcut(QKeySequence(), mw)
         self.custom_undo_shortcut.setContext(Qt.ShortcutContext.WindowShortcut)
         qconnect(self.custom_undo_shortcut.activated, self._on_card_restore_undo)
@@ -216,6 +233,9 @@ class EFDRC:
             self.done_shortcut,
             self.done_shortcut_numpad,
             self.cancel_shortcut,
+            self.undo_shortcut,
+            self.redo_shortcut,
+            self.redo_alt_shortcut,
             self.custom_undo_shortcut,
         ):
             if shortcut:
@@ -293,10 +313,74 @@ class EFDRC:
         if self._editor_is_visible():
             self.hide_editor()
 
+    def _run_editor_history_action(self, action: str) -> None:
+        if (
+            not self._editor_is_visible()
+            or not self.editor
+            or not getattr(self.editor, "web", None)
+        ):
+            return
+
+        web = self.editor.web
+        field_idx = self._active_editor_field_idx()
+
+        web.setFocus()
+
+        page_action = None
+        if action == "undo":
+            page_action = QWebEnginePage.WebAction.Undo
+        elif action == "redo":
+            page_action = QWebEnginePage.WebAction.Redo
+
+        if page_action is not None:
+            web.triggerPageAction(page_action)
+
+        focus_js = "const fallbackIndex = null;"
+        if field_idx is not None:
+            focus_js = f"const fallbackIndex = {field_idx};"
+
+        web.eval(
+            'require("anki/ui").loaded.then(() => {'
+            "const isEditable = (el) => !!el && ("
+            "el.isContentEditable || el.tagName === 'TEXTAREA' || "
+            "(el.tagName === 'INPUT' && !el.readOnly)"
+            ");"
+            f"{focus_js}"
+            "let active = document.activeElement;"
+            "const hadEditableFocus = isEditable(active);"
+            "if (!hadEditableFocus && fallbackIndex !== null) {"
+            "  focusField(fallbackIndex);"
+            "  active = document.activeElement;"
+            "}"
+            "if (!isEditable(active)) {"
+            "  return;"
+            "}"
+            "if (typeof active.focus === 'function') {"
+            "  active.focus();"
+            "}"
+            "if (!hadEditableFocus) {"
+            f"  try {{ document.execCommand('{action}'); }} catch (_err) {{}}"
+            "}"
+            "try {"
+            "  active.dispatchEvent(new InputEvent('input', { bubbles: true }));"
+            "} catch (_err) {"
+            "  active.dispatchEvent(new Event('input', { bubbles: true }));"
+            "}"
+            "});"
+        )
+
+    def _on_editor_undo(self) -> None:
+        self._run_editor_history_action("undo")
+
+    def _on_editor_redo(self) -> None:
+        self._run_editor_history_action("redo")
+
     def _on_card_restore_undo(self) -> None:
-        """Ctrl+Alt+Z / Undo Edit button: restore the note to the snapshot
-        taken when the editor was opened.  We must flush the editor first so
-        that the Python note object reflects the latest webview content."""
+        """Reset the note to the snapshot taken when the editor was opened.
+
+        We must flush the editor first so that the Python note object reflects
+        the latest webview content.
+        """
         if not self._editor_is_visible() or not self.editor:
             return
         if self.note_snapshot is None:
@@ -312,7 +396,7 @@ class EFDRC:
                     note[field_name] = original_value
                     changed = True
             if not changed:
-                tooltip("Nothing to restore \u2013 note is unchanged from when editing started.")
+                tooltip("Nothing to revert.")
                 return
             # Reload the editor to reflect the restored values
             field_idx = self._active_editor_field_idx() or 0
@@ -320,7 +404,7 @@ class EFDRC:
             if card:
                 self._set_editor_note(note, field_idx, card)
                 self.schedule_editor_refocus(field_idx, delay_ms=120)
-            tooltip("Note restored to state before editing.")
+            tooltip("Changes reverted to the state from when editing started.")
 
         # Flush current webview content → Python note object, then restore.
         save_now = getattr(
@@ -386,14 +470,21 @@ class EFDRC:
     def on_field_filter(
         self, txt: str, field: str, filt: str, ctx: TemplateRenderContext
     ) -> str:
+        card = None
+        try:
+            card = ctx.card()
+        except Exception:
+            card = None
+
         if filt == "edit":
+            if card and not utils.field_allowed_for_card(card, field, self.config):
+                return txt
             return self._wrap(txt, field, ctx)
-        if not self.config.get("auto_enable", True) or filt:
+        if filt:
             return txt
 
         template_name = ""
         try:
-            card = ctx.card()
             if card:
                 template_name = utils.template_name_for_card(card)
         except Exception:
@@ -405,7 +496,7 @@ class EFDRC:
         if cache_key in self._filter_cache:
             return self._wrap(txt, field, ctx) if self._filter_cache[cache_key] else txt
 
-        if not utils.field_allowed_for_card(ctx.card(), field, self.config):
+        if not card or not utils.field_allowed_for_card(card, field, self.config):
             self._filter_cache[cache_key] = False
             return txt
 
@@ -521,6 +612,39 @@ class EFDRC:
             and getattr(changes, "note_text", False)
         )
 
+    def should_auto_wrap_card(self, card: Card) -> bool:
+        reviewer = getattr(mw, "reviewer", None)
+        current_card = reviewer.card if reviewer and reviewer.card else None
+        return bool(
+            self.config.get("auto_enable", True)
+            and getattr(mw, "state", None) == "review"
+            and current_card
+            and current_card.id == card.id
+        )
+
+    def editable_template_for_card(self, card: Card) -> Optional[dict]:
+        if not self.should_auto_wrap_card(card):
+            return None
+
+        template = card.template()
+        if not template:
+            return None
+
+        note = card.note()
+        field_names = {field["name"] for field in note.model()["flds"]}
+        updated = dict(template)
+        changed = False
+        for key in ("qfmt", "afmt", "bqfmt", "bafmt"):
+            value = updated.get(key)
+            if not isinstance(value, str) or not value:
+                continue
+            wrapped = utils.add_edit_filter_to_template(value, field_names)
+            if wrapped != value:
+                updated[key] = wrapped
+                changed = True
+
+        return updated if changed else None
+
     def _editor_uses_parent_window(self) -> bool:
         try:
             return "parentWindow" in inspect.signature(Editor.__init__).parameters
@@ -625,8 +749,8 @@ class EFDRC:
 
         self.active_card_id = card.id
         self.reload_after_save = False
-        # Capture a snapshot of all field values before editing begins so that
-        # Ctrl+Alt+Z can restore the note to this exact state.
+        # Capture a snapshot of all field values before editing begins so the
+        # optional fallback shortcut can revert to this exact state.
         self.note_snapshot = {name: value for name, value in note.items()}
         self._suspend_main_window_undo_shortcuts()
         self._set_shortcuts_enabled(True)
@@ -713,5 +837,35 @@ if hasattr(Reviewer, "op_executed"):
 
         _efdrn_reviewer_op_executed._efdrn_wrapped = True  # type: ignore[attr-defined]
         Reviewer.op_executed = _efdrn_reviewer_op_executed
+
+if not getattr(anki.template.TemplateRenderContext._partially_render, "_efdrn_wrapped", False):
+    _efdrn_original_partially_render = anki.template.TemplateRenderContext._partially_render
+
+    def _efdrn_partially_render(
+        self: anki.template.TemplateRenderContext,
+    ) -> anki.template.PartiallyRenderedCard:
+        controller = globals().get("efdrc")
+        if (
+            controller
+            and not self._browser
+            and getattr(self, "_template", None) is None
+        ):
+            try:
+                modified_template = controller.editable_template_for_card(self.card())
+            except Exception:
+                modified_template = None
+            if modified_template is not None:
+                out = self._col._backend.render_uncommitted_card_legacy(
+                    note=self._note._to_backend_note(),
+                    card_ord=self._card.ord,
+                    template=to_json_bytes(modified_template),
+                    fill_empty=self._fill_empty,
+                    partial_render=True,
+                )
+                return anki.template.PartiallyRenderedCard.from_proto(out)
+        return _efdrn_original_partially_render(self)
+
+    _efdrn_partially_render._efdrn_wrapped = True  # type: ignore[attr-defined]
+    anki.template.TemplateRenderContext._partially_render = _efdrn_partially_render
 
 mw.addonManager.setWebExports(__name__, r"web/.*")

@@ -1,12 +1,12 @@
 # [Edit Field During Review (Native) [EFDRN]](https://github.com/athulkrishna2015/Edit-Field-During-Review-Native)
 
-This Anki add-on allows you to edit fields directly during review by embedding the native Anki editor into the review window.
+This Anki add-on lets you edit note fields directly during review by embedding Anki's native editor into the review window.
 Install from [anki web](https://ankiweb.net/shared/info/2117554822)
 
 ## Features
 
 - **Native Editor Support**: Use the full power of Anki's native editor (toolbars, clozes, MathJax, LaTeX, and more) directly in the review window.
-- **No-Setup Mode**: By default, **all fields are editable**. You do not need to manually add `edit:` to your card templates, though `{{edit:FieldName}}` is still supported for explicit control.
+- **No-Setup Mode**: By default, rendered note fields such as `{{Front}}` and `{{cloze:Text}}` are made editable automatically during review. You do not need to manually add `edit:` to your card templates, though `{{edit:FieldName}}` is still supported for explicit control.
 - **Seamless Integration**: The editor appears above your card content without opening a new window, preserving your review context.
 - **Granular Control**: Enable or disable editing for specific **Note Types**, **Templates (Card Types)**, or **Fields** via a simple tree-view configuration.
 - **Customizable Triggers**: Choose your preferred trigger modifier (Ctrl, Shift, Alt, or None) and action (Click or DoubleClick).
@@ -20,35 +20,53 @@ Install from [anki web](https://ankiweb.net/shared/info/2117554822)
 2. **Image Occlusion Cards**: On Image Occlusion notes, you can **Ctrl + Click** the image, use the review screen's **Edit** button, or press **E** to open the embedded editor.
 3. **Visual Feedback**: When holding your trigger modifier, editable fields and Image Occlusion areas show a dashed outline on hover.
 4. **Edit Your Content**: The native editor appears above your card. Standard Anki editor shortcuts and toolbar buttons are available.
-5. **Undo While Editing**: Use **Ctrl + Z** while the embedded editor is open, or click the **Undo Edit** button beside **Done**. If another add-on or a global shortcut still grabs `Ctrl+Z`, set a dedicated fallback shortcut in the add-on config.
+5. **Undo Limitation**: Undo inside the embedded editor is currently broken. To undo changes, first return to the review screen, then use Anki's undo there.
 6. **Save and Close**: Click the **Done** button, press **Ctrl + Enter**, or press **Esc** to save your changes and return to review immediately.
+
+If you disable **Auto-enable**, add `{{edit:FieldName}}` only to the fields you want editable.
 
 ![demo](https://github.com/user-attachments/assets/1e27d7d1-4b82-44c3-a38e-00e8d62acbd3)
 
 ## Configuration
 
-Access the configuration via **Tools > Add-ons > EFDRN > Config**.
+Access the configuration via either **Tools > Add-ons > EFDRN > Config** or **Tools > EFDRN Configuration**.
 
-- **Auto-enable**: Toggle whether the add-on should automatically enable editing for all fields without the `edit:` filter.
+- **Auto-enable**: Toggle whether the add-on should automatically enable editing for rendered note fields without the `edit:` filter.
+- **Explicit `edit:` support**: If Auto-enable is off, add `{{edit:FieldName}}` to any field you want clickable in review.
 - **Show outline**: Toggle the visual dashed outline on hover.
 - **Trigger Modifier**: Choose between `Ctrl`, `Shift`, `Alt`, or `None`.
 - **Trigger Action**: Choose between `Click` or `DoubleClick`.
-- **Custom Undo Shortcut**: Set a dedicated embedded-editor undo shortcut such as `Ctrl+Alt+Z`. Leave it blank to disable the fallback shortcut.
+- **Fallback Shortcut**: Set an optional fallback shortcut for the embedded reviewer editor. Leave it blank to disable it.
 - **Separate Reviewer Preferences**: When enabled, the embedded reviewer editor keeps its own colors, tag collapse state, MathJax/image/HTML toggle state, and paste behavior without changing Anki's main editor preferences.
-- **Exclusions**: Use the tree view to disable editing for specific Note Types, Templates, or Fields. Use the **Enable All** and **Disable All** buttons for bulk management.
+- **Exclusions**: Use the tree view to disable editing for specific Note Types, Templates, or Fields. Exclusions apply to both auto-enabled fields and explicit `{{edit:...}}` fields. Use the **Enable All** and **Disable All** buttons for bulk management.
 - **Support Tab**: The config dialog also includes a `Support` tab with large QR codes and copy buttons for UPI, BTC, and ETH.
 
-## Recent Changes (23/03/2026)
+## Change Log
 
-- **Fixed Undo/Redo**: The "Undo Edit" button and shortcuts now reliably refocus the active field before executing, ensuring changes are reverted correctly.
+### 25/03/2026
+
+- **Fixed No-Setup Editing**: Rendered reviewer fields are now auto-wrapped correctly, so Auto-enable works without manually adding `edit:` to templates.
+- **Exclusions Hardened**: Disabled note types, templates, and fields now apply to explicit `{{edit:...}}` usage too, and exclusion settings survive renames by using stable internal IDs.
+- **Toolbar Simplified**: The embedded editor now focuses on the native editing flow with **Done**, native undo/redo, and the optional fallback shortcut instead of a separate restore button.
+- **Documentation Cleanup**: Updated the README, FAQ, and config wording to match the current reviewer workflow.
+
+### 24/03/2026
+
 - **Eliminated Flicker**: The review screen now remains visible during the save transition, removing the "blank screen" jump when finishing an edit.
 - **Image Occlusion Support**: Added **Ctrl + Click** (or your custom modifier) support directly on Image Occlusion images to trigger the editor.
 - **Architectural Cleanup**: Refactored the internal code into specialized modules (`editor`, `utils`, `config`) for better stability and faster loading on newer Anki versions.
 - **Added to Tools Menu**: Quick access to configuration via `Tools > EFDRN Configuration`.
+- **README Refresh**: Updated installation info, screenshots, and repository links.
+
+### 23/03/2026
+
+- **Config Persistence Fix**: Configuration now resolves consistently through the base add-on name.
+- **Empty Field Triggering**: Empty editable fields now expose a visible placeholder so they can still be clicked during review.
+- **Undo/Redo Reliability**: Improved reviewer editing behavior and documentation around native undo/redo handling.
 
 ## Known Issues
 
-- **Undo Reliability**: While we have switched to more robust native methods to prevent cursor jumping and to support formatting changes (like Bold), the undo stack can still be inconsistent in certain complex editing scenarios or when multiple fields are modified rapidly. We are working on a more seamless fix for the editor's internal history.
+- **Undo Is Broken In The Embedded Editor**: Undo inside the embedded editor is currently broken. If you need to undo changes, first go back to the review screen, then use Anki's undo from there.
 
 ## Credits & License
 
