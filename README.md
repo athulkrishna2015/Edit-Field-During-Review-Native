@@ -69,7 +69,7 @@ Access the configuration via either **Tools > Add-ons > EFDRN > Config** or **To
 
 ## Known Issues
 
-- No known issues at this time. Please report bugs on [GitHub](https://github.com/athulkrishna2015/Edit-Field-During-Review-Native/issues).
+- **Undo**: Undo in the embedded editor may have some issues. If you experience problems, try disabling "Enable Custom Undo" in config or setting the undo style to "In-Editor Only".
 
 ## Credits & License
 
