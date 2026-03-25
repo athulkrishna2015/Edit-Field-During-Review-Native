@@ -11,7 +11,7 @@ Install from [anki web](https://ankiweb.net/shared/info/2117554822)
 - **Granular Control**: Enable or disable editing for specific **Note Types**, **Templates (Card Types)**, or **Fields** via a simple tree-view configuration.
 - **Customizable Triggers**: Choose your preferred trigger modifier (Ctrl, Shift, Alt, or None) and action (Click or DoubleClick).
 - **Review Screen Native Button**: Optionally adds an **Edit (N)** button on the review screen to open the embedded editor directly. This button is disabled by default and can be enabled in config.
-- **Image Occlusion Support**: Image Occlusion cards can open the embedded editor through **Ctrl + Click** on the image, the optional review screen **Edit (N)** button, or the **N** shortcut, even when there is no clickable field on the card.
+- **Image Occlusion Support**: Image Occlusion cards can open the embedded editor through the optional review screen **Edit (N)** button or the **N** shortcut, even when there is no clickable field on the card.
 - **Separate Reviewer Preferences**: Keep the embedded reviewer editor's color memory, collapse state, paste behavior, and editor toggles separate from Anki's main editor.
 - **Fast & Reliable**: Uses native components for maximum performance and compatibility with other add-ons.
 
@@ -19,7 +19,7 @@ Install from [anki web](https://ankiweb.net/shared/info/2117554822)
 
 1. **Trigger the Editor**: During review, use the default trigger: **Ctrl + Click** (or **Cmd + Click** on Mac) on the field content.
 2. **Review Screen Native Button**: If enabled in config, click **Edit (N)** to open the embedded editor directly from the review screen. The **N** shortcut works regardless of button visibility.
-3. **Image Occlusion Cards**: On Image Occlusion notes, you can **Ctrl + Click** the image, use the optional **Edit (N)** button, or press **N** to open the embedded editor.
+3. **Image Occlusion Cards**: On Image Occlusion notes, use the optional **Edit (N)** button or press **N** to open the embedded editor.
 4. **Visual Feedback**: When holding your trigger modifier, editable fields and Image Occlusion areas show a dashed outline on hover.
 5. **Edit Your Content**: The native editor appears above your card. Standard Anki editor shortcuts and toolbar buttons are available.
 6. **Undo Support**: Ctrl+Z behavior is configurable. Enable "Custom Undo" in config to choose a style: **Per-Field Revert** (reverts only the focused field, default), **Full Snapshot Revert** (reverts all fields), or **In-Editor Only** (standard Ctrl+Z). Ctrl+Y always works for redo.
@@ -47,6 +47,14 @@ Access the configuration via either **Tools > Add-ons > EFDRN > Config** or **To
 - **Exclusions**: Use the tree view to disable editing for specific Note Types, Templates, or Fields. Exclusions apply to both auto-enabled fields and explicit `{{edit:...}}` fields. Use the **Enable All** and **Disable All** buttons for bulk management.
 - **Support Tab**: The config dialog also includes a `Support` tab with large QR codes and copy buttons for UPI, BTC, and ETH.
 
+## Troubleshooting
+
+- **Can't edit during review**: Auto-enable is on by default. If you turned it off, add `{{edit:FieldName}}` to the fields you want clickable.
+- **Image Occlusion cards**: Use the optional **Edit (N)** button or the **N** shortcut to open the embedded editor. `Ctrl+Click` is currently unreliable on Image Occlusion cards.
+- **Editor shortcuts**: Standard native editor shortcuts such as `Ctrl+B` and `Ctrl+Shift+C` work inside the embedded editor.
+- **Closing the editor**: Use **Done**, `Ctrl+Enter`, or `Esc` to save your changes and return to review.
+- **Undo behavior**: By default, `Ctrl+Z` uses the embedded editor's normal undo. If **Custom Undo** is enabled, `Ctrl+Z` uses the selected undo style instead. `Ctrl+Y` continues to work for redo.
+
 ## Change Log
 
 ### 25/03/2026
@@ -58,12 +66,12 @@ Access the configuration via either **Tools > Add-ons > EFDRN > Config** or **To
 - **Fixed No-Setup Editing**: Rendered reviewer fields are now auto-wrapped correctly, so Auto-enable works without manually adding `edit:` to templates.
 - **Exclusions Hardened**: Disabled note types, templates, and fields now apply to explicit `{{edit:...}}` usage too, and exclusion settings survive renames by using stable internal IDs.
 - **Toolbar Simplified**: The embedded editor now focuses on the native editing flow with **Done**, native undo/redo instead of a separate restore button.
-- **Documentation Cleanup**: Updated the README, FAQ, and config wording to match the current reviewer workflow.
+- **Documentation Cleanup**: Updated the README, development notes, and config wording to match the current reviewer workflow.
 
 ### 24/03/2026
 
 - **Eliminated Flicker**: The review screen now remains visible during the save transition, removing the "blank screen" jump when finishing an edit.
-- **Image Occlusion Support**: Added **Ctrl + Click** (or your custom modifier) support directly on Image Occlusion images to trigger the editor.
+- **Image Occlusion Support**: Added review-screen support for opening the embedded editor on Image Occlusion cards.
 - **Architectural Cleanup**: Refactored the internal code into specialized modules (`editor`, `utils`, `config`) for better stability and faster loading on newer Anki versions.
 - **Added to Tools Menu**: Quick access to configuration via `Tools > EFDRN Configuration`.
 - **README Refresh**: Updated installation info, screenshots, and repository links.

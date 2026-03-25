@@ -23,6 +23,32 @@ This repository contains the source for the **Edit Field During Review (Native)*
 - Native Editor: When a field is Ctrl-clicked, a native Anki `Editor` is preloaded and then embedded into the reviewer area.
 - Close controls: Done button, `Ctrl+Enter`, and `Esc` all save changes and return to review.
 
+## Reviewer Styling Hooks
+
+The reviewer exposes these selectors for note styling and visual feedback:
+
+```css
+[data-efdrc-idx],
+.image-occlusion,
+.canvas-container,
+.upper-canvas,
+#image {
+}
+
+.efdrc-active [data-efdrc-idx],
+.efdrc-active .image-occlusion,
+.efdrc-active .canvas-container,
+.efdrc-active .upper-canvas,
+.efdrc-active #image {
+}
+```
+
+Notes:
+
+- `[data-efdrc-idx]` marks editable reviewer fields.
+- `.efdrc-active` is added while the configured trigger modifier is held down.
+- On Image Occlusion cards, the supported embedded-editor entry points are the review-screen **Edit (N)** button and the `N` shortcut. `Ctrl+Click` is currently unreliable there.
+
 ## Versioning Scheme
 
 Version format is strictly:
