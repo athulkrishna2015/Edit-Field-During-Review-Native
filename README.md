@@ -69,7 +69,7 @@ Access the configuration via either **Tools > Add-ons > EFDRN > Config** or **To
 
 ## Known Issues
 
-- **Undo**: Undo in the embedded editor may have some issues. If you experience problems, try disabling "Enable Custom Undo" in config or setting the undo style to "In-Editor Only".
+- **Undo**: Standard in-editor undo (Ctrl+Z) may not work reliably in the embedded editor. Enable "Custom Undo" in config and use "Per-Field Revert" or "Full Snapshot Revert" style as a workaround.
 
 ## Credits & License
 
