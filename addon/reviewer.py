@@ -82,11 +82,13 @@ class EFDRC:
             "exclusions_v2": {},
             "trigger_modifier": "Ctrl",
             "trigger_action": "Click",
+            "show_review_button": False,
             "separate_editor_preferences": True,
             "reviewer_editor_preferences": {},
         }
         self.config.setdefault("enable_undo", False)
         self.config.setdefault("undo_style", "per_field")
+        self.config.setdefault("show_review_button", False)
         self.config.setdefault("separate_editor_preferences", True)
         self.config.setdefault("exclusions_v2", {})
         reviewer_prefs = self.config.setdefault("reviewer_editor_preferences", {})
@@ -556,7 +558,9 @@ class EFDRC:
             web_content.body += f"<script>EFDRC.setup({json.dumps(js_conf)});</script>"
             return
 
-        if isinstance(context, ReviewerBottomBar):
+        if isinstance(context, ReviewerBottomBar) and self.config.get(
+            "show_review_button", False
+        ):
             web_content.js.append(f"/_addons/{addon_package}/web/efdrc.js")
             js_conf = {"mode": "bottom"}
             web_content.body += f"<script>EFDRC.setup({json.dumps(js_conf)});</script>"

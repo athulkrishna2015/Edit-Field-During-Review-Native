@@ -303,12 +303,17 @@ def on_config_action(addon_manager: Any, module_name: str, on_save: Any) -> None
     act_combo.addItems(["Click", "DoubleClick"])
     act_combo.setCurrentText(config.get("trigger_action", "Click"))
     grid.addWidget(act_combo, 3, 1)
+    show_review_button_cb = QCheckBox(
+        'Show "Edit (N)" button on the review screen'
+    )
+    show_review_button_cb.setChecked(config.get("show_review_button", False))
+    grid.addWidget(show_review_button_cb, 4, 0, 1, 2)
     # --- Undo settings ---
     enable_undo_cb = QCheckBox("Enable Custom Undo (Ctrl+Z)")
     enable_undo_cb.setChecked(config.get("enable_undo", False))
-    grid.addWidget(enable_undo_cb, 4, 0, 1, 2)
+    grid.addWidget(enable_undo_cb, 5, 0, 1, 2)
 
-    grid.addWidget(QLabel("Undo Style:"), 5, 0)
+    grid.addWidget(QLabel("Undo Style:"), 6, 0)
     UNDO_STYLE_MAP = {
         "Full Snapshot Revert": "full_snapshot",
         "Per-Field Revert": "per_field",
@@ -321,7 +326,7 @@ def on_config_action(addon_manager: Any, module_name: str, on_save: Any) -> None
         if value == current_style:
             undo_style_combo.setCurrentText(label)
             break
-    grid.addWidget(undo_style_combo, 5, 1)
+    grid.addWidget(undo_style_combo, 6, 1)
 
     undo_style_help = QLabel(
         "<b>Full Snapshot Revert</b>: Ctrl+Z reverts all fields to their state "
@@ -330,7 +335,7 @@ def on_config_action(addon_manager: Any, module_name: str, on_save: Any) -> None
         "<b>In-Editor Only</b>: Ctrl+Z performs standard in-editor undo only."
     )
     undo_style_help.setWordWrap(True)
-    grid.addWidget(undo_style_help, 6, 0, 1, 2)
+    grid.addWidget(undo_style_help, 7, 0, 1, 2)
 
     def _update_undo_controls(checked: bool) -> None:
         undo_style_combo.setEnabled(checked)
@@ -343,14 +348,14 @@ def on_config_action(addon_manager: Any, module_name: str, on_save: Any) -> None
         "Keep reviewer editor preferences separate from Anki's main editor"
     )
     separate_prefs_cb.setChecked(config.get("separate_editor_preferences", False))
-    grid.addWidget(separate_prefs_cb, 7, 0, 1, 2)
+    grid.addWidget(separate_prefs_cb, 8, 0, 1, 2)
     prefs_help = QLabel(
         "When enabled, changes to color memory, tags collapse state, MathJax, "
         "image shrink, HTML closing, and paste options stay local to the "
         "embedded reviewer editor."
     )
     prefs_help.setWordWrap(True)
-    grid.addWidget(prefs_help, 8, 0, 1, 2)
+    grid.addWidget(prefs_help, 9, 0, 1, 2)
     settings_layout.addWidget(global_grp)
 
     tree = QTreeWidget()
@@ -484,6 +489,7 @@ def on_config_action(addon_manager: Any, module_name: str, on_save: Any) -> None
                 "show_outline": outline_cb.isChecked(),
                 "trigger_modifier": mod_combo.currentText(),
                 "trigger_action": act_combo.currentText(),
+                "show_review_button": show_review_button_cb.isChecked(),
                 "enable_undo": enable_undo_cb.isChecked(),
                 "undo_style": UNDO_STYLE_MAP.get(
                     undo_style_combo.currentText(), "per_field"

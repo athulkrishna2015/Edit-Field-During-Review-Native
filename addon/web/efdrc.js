@@ -5,29 +5,60 @@
             action: 'Click',
             mode: 'reviewer'
         },
+        cloneBottomBarButton: function(button) {
+            const clonedButton = button.cloneNode(true);
+            clonedButton.title = 'Shortcut key: N';
+
+            if (clonedButton.tagName === 'INPUT') {
+                clonedButton.value = 'Edit (N)';
+            } else {
+                clonedButton.textContent = 'Edit (N)';
+            }
+
+            return clonedButton;
+        },
         injectNativeButton: function() {
             const editBtn = document.querySelector("button[onclick*=\"pycmd('edit')\"], input[onclick*=\"pycmd('edit')\"]");
-            if (!editBtn || document.getElementById('efdrc-native-edit')) {
+            const editCell = editBtn ? editBtn.closest('td') : null;
+            const middle = document.getElementById('middle');
+            if (!editBtn || !editCell || !middle || document.getElementById('efdrc-native-edit-cell')) {
                 return;
             }
 
-            const nativeBtn = editBtn.cloneNode(true);
+            const nativeBtn = this.cloneBottomBarButton(editBtn);
             nativeBtn.id = 'efdrc-native-edit';
-            nativeBtn.title = 'Shortcut key: N';
-
-            if (nativeBtn.tagName === 'INPUT') {
-                nativeBtn.value = 'Edit (N)';
-            } else {
-                nativeBtn.textContent = 'Edit (N)';
-            }
-
+            nativeBtn.style.marginLeft = '0';
             nativeBtn.onclick = (event) => {
                 window.pycmd('EFDRC!edit_native');
                 event.preventDefault();
                 event.stopPropagation();
             };
 
-            editBtn.insertAdjacentElement('afterend', nativeBtn);
+            const editGroup = document.createElement('div');
+            editGroup.id = 'efdrc-native-edit-cell';
+            editGroup.style.display = 'inline-flex';
+            editGroup.style.alignItems = 'flex-start';
+            editGroup.style.whiteSpace = 'nowrap';
+            editGroup.appendChild(editBtn);
+            editGroup.appendChild(nativeBtn);
+            editCell.replaceChildren(editGroup);
+
+            const placeholderCell = document.createElement('td');
+            placeholderCell.id = 'efdrc-native-edit-spacer';
+            placeholderCell.className = 'stat';
+            placeholderCell.align = 'center';
+            placeholderCell.vAlign = 'top';
+            placeholderCell.setAttribute('aria-hidden', 'true');
+
+            const placeholderBtn = this.cloneBottomBarButton(editBtn);
+            placeholderBtn.tabIndex = -1;
+            placeholderBtn.disabled = true;
+            placeholderBtn.style.marginLeft = '0';
+            placeholderBtn.style.visibility = 'hidden';
+            placeholderBtn.style.pointerEvents = 'none';
+            placeholderCell.appendChild(placeholderBtn);
+
+            middle.insertAdjacentElement('afterend', placeholderCell);
         },
         setup: function(conf) {
             if (conf) {
