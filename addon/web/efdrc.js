@@ -3,7 +3,42 @@
         config: {
             modifier: 'Ctrl',
             action: 'Click',
-            mode: 'reviewer'
+            mode: 'reviewer',
+            isImageOcclusion: false
+        },
+        isImageOcclusionTarget: function(element) {
+            const mediaTags = new Set([
+                'img',
+                'svg',
+                'image',
+                'canvas',
+                'path',
+                'rect',
+                'ellipse',
+                'polygon',
+                'g',
+                'use'
+            ]);
+
+            let el = element;
+            while (el && el !== document.body) {
+                const tagName = (el.tagName || '').toLowerCase();
+                if (mediaTags.has(tagName)) {
+                    return true;
+                }
+                if (
+                    el.id === 'image' ||
+                    el.classList.contains('image-occlusion') ||
+                    el.classList.contains('canvas-container') ||
+                    el.classList.contains('upper-canvas') ||
+                    el.classList.contains('lower-canvas')
+                ) {
+                    return true;
+                }
+                el = el.parentElement;
+            }
+
+            return false;
         },
         cloneBottomBarButton: function(button) {
             const clonedButton = button.cloneNode(true);
@@ -88,9 +123,8 @@
                             event.stopPropagation();
                             return;
                         }
-                        // Support for Image Occlusion elements
-                        if (el.id === 'io-overlay' || el.id === 'io-wrapper' || el.id === 'io-header' || el.id === 'io-footer' || el.id === 'io-image') {
-                            window.pycmd('edit');
+                        if (this.config.isImageOcclusion && this.isImageOcclusionTarget(el)) {
+                            window.pycmd('EFDRC!edit_native');
                             event.preventDefault();
                             event.stopPropagation();
                             return;

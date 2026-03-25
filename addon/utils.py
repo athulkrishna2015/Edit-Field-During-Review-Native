@@ -11,7 +11,12 @@ _FIELD_REPLACEMENT_RE = re.compile(r"{{([^{}]+)}}")
 
 
 def note_is_image_occlusion(note: Note) -> bool:
-    kind = note.model().get("originalStockKind")
+    model = note.model()
+    kind = model.get("originalStockKind")
+    if kind is None:
+        config = model.get("config")
+        if isinstance(config, dict):
+            kind = config.get("originalStockKind", config.get("original_stock_kind"))
     if hasattr(kind, "name"):
         kind = kind.name
     if kind == "ORIGINAL_STOCK_KIND_IMAGE_OCCLUSION":
@@ -19,6 +24,11 @@ def note_is_image_occlusion(note: Note) -> bool:
     try:
         return int(kind) == 6
     except (TypeError, ValueError):
+        pass
+
+    try:
+        return mw.backend.get_image_occlusion_fields(note.mid) is not None
+    except Exception:
         return False
 
 

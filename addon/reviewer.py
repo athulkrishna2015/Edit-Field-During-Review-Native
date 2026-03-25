@@ -44,6 +44,7 @@ class EFDRC:
         self.is_saving = False
         self.reload_after_save = False
         self.pending_refocus_field_idx: Optional[int] = None
+        self.pending_refocus_force = False
         self.preload_delay_ms = 150
         self.preload_timer = QTimer(mw)
         self.preload_timer.setSingleShot(True)
@@ -239,11 +240,15 @@ class EFDRC:
         return getattr(self.editor, "last_field_index", None)
 
     def schedule_editor_refocus(
-        self, field_idx: Optional[int] = None, delay_ms: int = 75
+        self,
+        field_idx: Optional[int] = None,
+        delay_ms: int = 75,
+        force: bool = False,
     ) -> None:
         if field_idx is None:
             field_idx = self._active_editor_field_idx()
         self.pending_refocus_field_idx = field_idx
+        self.pending_refocus_force = self.pending_refocus_force or force
         if self.refocus_timer.isActive():
             self.refocus_timer.stop()
         self.refocus_timer.start(delay_ms)
@@ -258,16 +263,34 @@ class EFDRC:
             return
 
         field_idx = self.pending_refocus_field_idx
+        force_refocus = self.pending_refocus_force
         if field_idx is None:
             field_idx = self._active_editor_field_idx()
         self.pending_refocus_field_idx = None
-
-        self.editor.web.setFocus()
+        self.pending_refocus_force = False
         if field_idx is None:
+            if force_refocus:
+                self.editor.web.setFocus()
             return
 
+        if force_refocus:
+            self.editor.web.setFocus()
+
         self.editor.web.eval(
-            f'require("anki/ui").loaded.then(() => {{ focusField({field_idx}); }});'
+            'require("anki/ui").loaded.then(() => {'
+            f"const forceFocus = {json.dumps(force_refocus)};"
+            f"const targetIndex = {field_idx};"
+            "const isEditable = (el) => !!el && ("
+            "el.isContentEditable || el.tagName === 'TEXTAREA' || "
+            "(el.tagName === 'INPUT' && !el.readOnly)"
+            ");"
+            "if (!forceFocus && isEditable(document.activeElement)) {"
+            "  return;"
+            "}"
+            "if (typeof focusField === 'function') {"
+            "  focusField(targetIndex);"
+            "}"
+            "});"
         )
 
     def _main_window_undo_actions(self) -> tuple[Optional[QAction], Optional[QAction]]:
@@ -430,7 +453,7 @@ class EFDRC:
             card = mw.reviewer.card if mw.reviewer else None
             if card:
                 self._set_editor_note(note, field_idx, card)
-                self.schedule_editor_refocus(field_idx, delay_ms=120)
+                self.schedule_editor_refocus(field_idx, delay_ms=120, force=True)
 
         # Flush current webview content → Python note object, then restore.
         save_now = getattr(
@@ -466,6 +489,7 @@ class EFDRC:
         self.note_snapshot = None
         self.reload_after_save = False
         self.pending_refocus_field_idx = None
+        self.pending_refocus_force = False
         if self.refocus_timer.isActive():
             self.refocus_timer.stop()
         if self.done_btn:
@@ -487,7 +511,7 @@ class EFDRC:
         if not utils.note_is_image_occlusion(card.note()):
             return False
         if self._editor_is_visible():
-            self.schedule_editor_refocus(delay_ms=30)
+            self.schedule_editor_refocus(delay_ms=30, force=True)
             return True
         if not utils.card_has_any_allowed_field(card, self.config):
             return False
@@ -550,10 +574,15 @@ class EFDRC:
             web_content.js.append(f"/_addons/{addon_package}/web/efdrc.js")
             if self.config.get("show_outline", True):
                 web_content.css.append(f"/_addons/{addon_package}/web/efdrc.css")
+            reviewer = getattr(mw, "reviewer", None)
+            card = reviewer.card if reviewer and reviewer.card else None
             js_conf = {
                 "modifier": self.config.get("trigger_modifier", "Ctrl"),
                 "action": self.config.get("trigger_action", "Click"),
                 "mode": "reviewer",
+                "isImageOcclusion": bool(
+                    card and utils.note_is_image_occlusion(card.note())
+                ),
             }
             web_content.body += f"<script>EFDRC.setup({json.dumps(js_conf)});</script>"
             return
@@ -615,7 +644,7 @@ class EFDRC:
 
     def _on_review_edit_shortcut(self) -> None:
         if self._editor_is_visible():
-            self.schedule_editor_refocus()
+            self.schedule_editor_refocus(force=True)
             return
         if self.open_image_occlusion_editor():
             return
@@ -623,7 +652,7 @@ class EFDRC:
 
     def _open_native_reviewer_editor(self) -> bool:
         if self._editor_is_visible():
-            self.schedule_editor_refocus()
+            self.schedule_editor_refocus(force=True)
             return True
         if self.open_image_occlusion_editor():
             return True
@@ -832,7 +861,7 @@ class EFDRC:
         self._set_review_screen_visible(False)
         self.editor_widget.show()
         self._set_editor_note(note, field_idx, card)
-        self.schedule_editor_refocus(field_idx, delay_ms=120)
+        self.schedule_editor_refocus(field_idx, delay_ms=120, force=True)
         if self.done_btn:
             self.done_btn.setEnabled(True)
 
@@ -905,9 +934,11 @@ if hasattr(Reviewer, "op_executed"):
         ) -> bool:
             controller = globals().get("efdrc")
             if controller and controller.should_defer_reviewer_refresh(reviewer, changes):
-                result = _efdrn_original_op_executed(reviewer, changes, handler, False)
-                controller.schedule_editor_refocus(delay_ms=120)
-                return result
+                # While the embedded editor is open, redrawing the hidden
+                # reviewer can steal focus back via Anki's reviewer refresh
+                # machinery. Let the editor stay in control and rely on the
+                # normal reviewer reload when editing finishes.
+                return False
             return _efdrn_original_op_executed(reviewer, changes, handler, focused)
 
         _efdrn_reviewer_op_executed._efdrn_wrapped = True  # type: ignore[attr-defined]

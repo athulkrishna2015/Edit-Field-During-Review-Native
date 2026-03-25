@@ -51,6 +51,7 @@ Access the configuration via either **Tools > Add-ons > EFDRN > Config** or **To
 
 ### 25/03/2026
 
+- **Flicker Fix**: The embedded editor no longer causes the review screen to flicker or blank out while saving or redrawing the current card.
 - **Review Screen Native Button**: Added an optional **Edit (N)** button and **N** shortcut on the review screen to open the embedded editor directly. The button is disabled by default and can be enabled in config.
 - **Multiple Undo Styles**: Ctrl+Z now supports configurable undo behavior with three styles: Per-Field Revert (reverts only the focused field), Full Snapshot Revert (reverts all fields to when editing started), and In-Editor Only (standard Ctrl+Z behavior).
 - **Enable/Disable Undo**: New "Enable Custom Undo" toggle in config (disabled by default). When enabled, Ctrl+Z uses the chosen undo style instead of in-editor undo.
@@ -72,10 +73,6 @@ Access the configuration via either **Tools > Add-ons > EFDRN > Config** or **To
 - **Config Persistence Fix**: Configuration now resolves consistently through the base add-on name.
 - **Empty Field Triggering**: Empty editable fields now expose a visible placeholder so they can still be clicked during review.
 - **Undo/Redo Reliability**: Improved reviewer editing behavior and documentation around native undo/redo handling.
-
-## Known Issues
-
-- **Undo**: Standard in-editor undo (Ctrl+Z) may not work reliably in the embedded editor. Enable "Custom Undo" in config and use "Per-Field Revert" or "Full Snapshot Revert" style as a workaround.
 
 ## Credits & License
 
