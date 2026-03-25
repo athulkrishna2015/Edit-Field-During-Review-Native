@@ -6,7 +6,7 @@ By default, note fields rendered during review are editable. You can still use t
 
 On normal cards, use **Ctrl + Click** (or **Cmd + Click** on Mac) on the field content to trigger the native editor.
 
-For **Image Occlusion** cards, you can **Ctrl + Click** the image, use the review screen's **Edit** button, or press **E** to open the embedded editor.
+For **Image Occlusion** cards, you can **Ctrl + Click** the image, use the optional review screen **Edit (N)** button, or press **N** to open the embedded editor. The `Edit (N)` button is off by default and can be enabled in the add-on config.
 
 ## How do I style the editable fields?
 
@@ -14,14 +14,20 @@ When the trigger modifier is held down, editable fields and Image Occlusion area
 
 ```css
 /* Styling for fields that can be edited */
-[data-efdrc-idx], #io-overlay, #io-wrapper {
+[data-efdrc-idx],
+.image-occlusion,
+.canvas-container,
+.upper-canvas,
+#image {
     /* your styles here */
 }
 
 /* Styling specifically when the trigger modifier is active */
 .efdrc-active [data-efdrc-idx],
-.efdrc-active #io-overlay,
-.efdrc-active #io-wrapper {
+.efdrc-active .image-occlusion,
+.efdrc-active .canvas-container,
+.efdrc-active .upper-canvas,
+.efdrc-active #image {
     outline: 1px dashed #0078d4;
 }
 ```
@@ -36,8 +42,4 @@ You can click the **Done** button at the top of the editor, press **Ctrl + Enter
 
 ## How do I undo changes inside the embedded editor?
 
-Use **Ctrl + Z** while the embedded editor is open for native editor undo/redo.
-
-## Known Issues
-
-- **Undo/Redo Stability**: We've improved the undo/redo functionality to fix cursor jumping and formatting issues (like bolding), but it may still be inconsistent in very complex editing scenarios. We are continuing to refine the integration with Anki's internal editor history.
+By default, **Ctrl + Z** uses the embedded editor's normal undo. If you enable **Custom Undo** in the add-on config, **Ctrl + Z** can instead use **Per-Field Revert** or **Full Snapshot Revert**. **Ctrl + Y** continues to work for redo.
