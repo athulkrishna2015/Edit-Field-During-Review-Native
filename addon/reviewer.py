@@ -36,7 +36,6 @@ class EFDRC:
         self.undo_shortcut: Optional[QShortcut] = None
         self.redo_shortcut: Optional[QShortcut] = None
         self.redo_alt_shortcut: Optional[QShortcut] = None
-        self.custom_undo_shortcut: Optional[QShortcut] = None
         self.saved_main_undo_shortcuts: Optional[list[QKeySequence]] = None
         self.saved_main_redo_shortcuts: Optional[list[QKeySequence]] = None
         self.main_editor_pref_snapshot: Optional[Dict[str, Any]] = None
@@ -83,11 +82,11 @@ class EFDRC:
             "exclusions_v2": {},
             "trigger_modifier": "Ctrl",
             "trigger_action": "Click",
-            "custom_undo_shortcut": "Ctrl+Alt+Z",
             "separate_editor_preferences": True,
             "reviewer_editor_preferences": {},
         }
-        self.config.setdefault("custom_undo_shortcut", "Ctrl+Alt+Z")
+        self.config.setdefault("enable_undo", False)
+        self.config.setdefault("undo_style", "per_field")
         self.config.setdefault("separate_editor_preferences", True)
         self.config.setdefault("exclusions_v2", {})
         reviewer_prefs = self.config.setdefault("reviewer_editor_preferences", {})
@@ -121,17 +120,11 @@ class EFDRC:
         self.main_editor_pref_snapshot = None
         cfg.apply_editor_preferences(snapshot, self.editor)
 
-    def _configured_custom_undo_shortcut(self) -> str:
-        return cfg.shortcut_to_text(self.config.get("custom_undo_shortcut"))
-
     def _refresh_editor_controls(self) -> None:
         if self.done_btn:
             self.done_btn.setText("Done (Ctrl+Enter)")
 
     def _apply_shortcut_config(self) -> None:
-        if self.custom_undo_shortcut:
-            custom_shortcut = self._configured_custom_undo_shortcut()
-            self.custom_undo_shortcut.setKey(QKeySequence(custom_shortcut))
         self._refresh_editor_controls()
 
     def on_config_action(self) -> None:
@@ -220,11 +213,6 @@ class EFDRC:
         self.redo_alt_shortcut.setContext(Qt.ShortcutContext.WindowShortcut)
         qconnect(self.redo_alt_shortcut.activated, self._on_editor_redo)
 
-        # Optional fallback shortcut for resetting the note snapshot.
-        self.custom_undo_shortcut = QShortcut(QKeySequence(), mw)
-        self.custom_undo_shortcut.setContext(Qt.ShortcutContext.WindowShortcut)
-        qconnect(self.custom_undo_shortcut.activated, self._on_card_restore_undo)
-
         self._apply_shortcut_config()
         self._set_shortcuts_enabled(False)
 
@@ -236,7 +224,6 @@ class EFDRC:
             self.undo_shortcut,
             self.redo_shortcut,
             self.redo_alt_shortcut,
-            self.custom_undo_shortcut,
         ):
             if shortcut:
                 shortcut.setEnabled(enabled)
@@ -370,41 +357,78 @@ class EFDRC:
         )
 
     def _on_editor_undo(self) -> None:
+        """Ctrl+Z handler.  Behaviour depends on undo config.
+
+        When ``enable_undo`` is on and style is not ``editor_only``,
+        this delegates to the snapshot-revert logic.  Otherwise it
+        performs a normal in-editor undo.
+        """
+        if (
+            self.config.get("enable_undo", False)
+            and self.config.get("undo_style", "per_field") != "editor_only"
+        ):
+            self._on_card_restore_undo()
+            return
         self._run_editor_history_action("undo")
 
     def _on_editor_redo(self) -> None:
         self._run_editor_history_action("redo")
 
     def _on_card_restore_undo(self) -> None:
-        """Reset the note to the snapshot taken when the editor was opened.
+        """Reset the note (or focused field) to the snapshot taken when the editor was opened.
 
-        We must flush the editor first so that the Python note object reflects
-        the latest webview content.
+        Behaviour depends on ``undo_style``:
+        - ``full_snapshot``: reverts **all** fields to the snapshot.
+        - ``per_field``: reverts only the **currently focused** field.
+        - ``editor_only``: no-op (shortcut should already be disabled).
         """
         if not self._editor_is_visible() or not self.editor:
             return
         if self.note_snapshot is None:
             return
 
+        undo_style = self.config.get("undo_style", "full_snapshot")
+        if undo_style == "editor_only":
+            return
+
         def _do_restore() -> None:
             note = getattr(self.editor, "note", None)
             if note is None or self.note_snapshot is None:
                 return
-            changed = False
-            for field_name, original_value in self.note_snapshot.items():
-                if field_name in note and note[field_name] != original_value:
-                    note[field_name] = original_value
-                    changed = True
-            if not changed:
-                tooltip("Nothing to revert.")
-                return
-            # Reload the editor to reflect the restored values
+
             field_idx = self._active_editor_field_idx() or 0
+            changed = False
+
+            if undo_style == "per_field":
+                # Revert only the currently focused field
+                field_name = self._field_name_for_index(note, field_idx)
+                if (
+                    field_name is not None
+                    and field_name in self.note_snapshot
+                    and note[field_name] != self.note_snapshot[field_name]
+                ):
+                    note[field_name] = self.note_snapshot[field_name]
+                    changed = True
+                if not changed:
+                    tooltip("Nothing to revert in this field.")
+                    return
+                tooltip(f"Field \"{field_name}\" reverted.")
+            else:
+                # full_snapshot — revert all fields
+                for field_name, original_value in self.note_snapshot.items():
+                    if field_name in note and note[field_name] != original_value:
+                        note[field_name] = original_value
+                        changed = True
+                if not changed:
+                    tooltip("Nothing to revert.")
+                    return
+                tooltip("Changes reverted to the state from when editing started.")
+
+            # Reload the editor to reflect the restored values
             card = mw.reviewer.card if mw.reviewer else None
             if card:
                 self._set_editor_note(note, field_idx, card)
                 self.schedule_editor_refocus(field_idx, delay_ms=120)
-            tooltip("Changes reverted to the state from when editing started.")
 
         # Flush current webview content → Python note object, then restore.
         save_now = getattr(
@@ -415,6 +439,17 @@ class EFDRC:
             save_now(_do_restore)
         else:
             _do_restore()
+
+    @staticmethod
+    def _field_name_for_index(note: Note, idx: int) -> Optional[str]:
+        """Return the field name at *idx* for *note*, or ``None``."""
+        try:
+            fields = note.model()["flds"]
+            if 0 <= idx < len(fields):
+                return fields[idx]["name"]
+        except Exception:
+            pass
+        return None
 
     def _editor_is_visible(self) -> bool:
         return bool(self.editor_widget and not self.editor_widget.isHidden())

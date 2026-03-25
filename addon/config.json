@@ -5,7 +5,9 @@
     "exclusions_v2": {},
     "trigger_modifier": "Ctrl",
     "trigger_action": "Click",
-    "custom_undo_shortcut": "Ctrl+Alt+Z",
+    "enable_undo": false,
+    "undo_style": "per_field",
     "separate_editor_preferences": true,
     "reviewer_editor_preferences": {}
 }
+

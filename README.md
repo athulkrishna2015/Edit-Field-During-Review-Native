@@ -20,7 +20,7 @@ Install from [anki web](https://ankiweb.net/shared/info/2117554822)
 2. **Image Occlusion Cards**: On Image Occlusion notes, you can **Ctrl + Click** the image, use the review screen's **Edit** button, or press **E** to open the embedded editor.
 3. **Visual Feedback**: When holding your trigger modifier, editable fields and Image Occlusion areas show a dashed outline on hover.
 4. **Edit Your Content**: The native editor appears above your card. Standard Anki editor shortcuts and toolbar buttons are available.
-5. **Undo Limitation**: Undo inside the embedded editor is currently broken. To undo changes, first return to the review screen, then use Anki's undo there.
+5. **Undo Support**: Ctrl+Z behavior is configurable. Enable "Custom Undo" in config to choose a style: **Per-Field Revert** (reverts only the focused field, default), **Full Snapshot Revert** (reverts all fields), or **In-Editor Only** (standard Ctrl+Z). Ctrl+Y always works for redo.
 6. **Save and Close**: Click the **Done** button, press **Ctrl + Enter**, or press **Esc** to save your changes and return to review immediately.
 
 If you disable **Auto-enable**, add `{{edit:FieldName}}` only to the fields you want editable.
@@ -36,7 +36,8 @@ Access the configuration via either **Tools > Add-ons > EFDRN > Config** or **To
 - **Show outline**: Toggle the visual dashed outline on hover.
 - **Trigger Modifier**: Choose between `Ctrl`, `Shift`, `Alt`, or `None`.
 - **Trigger Action**: Choose between `Click` or `DoubleClick`.
-- **Fallback Shortcut**: Set an optional fallback shortcut for the embedded reviewer editor. Leave it blank to disable it.
+- **Enable Custom Undo (Ctrl+Z)**: Toggle enhanced Ctrl+Z behavior on or off (disabled by default).
+- **Undo Style**: Choose between `Per-Field Revert` (reverts only the focused field, default), `Full Snapshot Revert` (reverts all fields), or `In-Editor Only` (standard Ctrl+Z behavior).
 - **Separate Reviewer Preferences**: When enabled, the embedded reviewer editor keeps its own colors, tag collapse state, MathJax/image/HTML toggle state, and paste behavior without changing Anki's main editor preferences.
 - **Exclusions**: Use the tree view to disable editing for specific Note Types, Templates, or Fields. Exclusions apply to both auto-enabled fields and explicit `{{edit:...}}` fields. Use the **Enable All** and **Disable All** buttons for bulk management.
 - **Support Tab**: The config dialog also includes a `Support` tab with large QR codes and copy buttons for UPI, BTC, and ETH.
@@ -45,9 +46,11 @@ Access the configuration via either **Tools > Add-ons > EFDRN > Config** or **To
 
 ### 25/03/2026
 
+- **Multiple Undo Styles**: Ctrl+Z now supports configurable undo behavior with three styles: Per-Field Revert (reverts only the focused field), Full Snapshot Revert (reverts all fields to when editing started), and In-Editor Only (standard Ctrl+Z behavior).
+- **Enable/Disable Undo**: New "Enable Custom Undo" toggle in config (disabled by default). When enabled, Ctrl+Z uses the chosen undo style instead of in-editor undo.
 - **Fixed No-Setup Editing**: Rendered reviewer fields are now auto-wrapped correctly, so Auto-enable works without manually adding `edit:` to templates.
 - **Exclusions Hardened**: Disabled note types, templates, and fields now apply to explicit `{{edit:...}}` usage too, and exclusion settings survive renames by using stable internal IDs.
-- **Toolbar Simplified**: The embedded editor now focuses on the native editing flow with **Done**, native undo/redo, and the optional fallback shortcut instead of a separate restore button.
+- **Toolbar Simplified**: The embedded editor now focuses on the native editing flow with **Done**, native undo/redo instead of a separate restore button.
 - **Documentation Cleanup**: Updated the README, FAQ, and config wording to match the current reviewer workflow.
 
 ### 24/03/2026
@@ -66,7 +69,7 @@ Access the configuration via either **Tools > Add-ons > EFDRN > Config** or **To
 
 ## Known Issues
 
-- **Undo Is Broken In The Embedded Editor**: Undo inside the embedded editor is currently broken. If you need to undo changes, first go back to the review screen, then use Anki's undo from there.
+- No known issues at this time. Please report bugs on [GitHub](https://github.com/athulkrishna2015/Edit-Field-During-Review-Native/issues).
 
 ## Credits & License
 

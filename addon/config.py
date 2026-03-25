@@ -303,31 +303,54 @@ def on_config_action(addon_manager: Any, module_name: str, on_save: Any) -> None
     act_combo.addItems(["Click", "DoubleClick"])
     act_combo.setCurrentText(config.get("trigger_action", "Click"))
     grid.addWidget(act_combo, 3, 1)
-    grid.addWidget(QLabel("Fallback Shortcut:"), 4, 0)
-    undo_shortcut_edit = QKeySequenceEdit()
-    configured_custom_undo = shortcut_to_text(config.get("custom_undo_shortcut"))
-    if configured_custom_undo:
-        undo_shortcut_edit.setKeySequence(QKeySequence(configured_custom_undo))
-    undo_shortcut_edit.setClearButtonEnabled(True)
-    grid.addWidget(undo_shortcut_edit, 4, 1)
+    # --- Undo settings ---
+    enable_undo_cb = QCheckBox("Enable Custom Undo (Ctrl+Z)")
+    enable_undo_cb.setChecked(config.get("enable_undo", False))
+    grid.addWidget(enable_undo_cb, 4, 0, 1, 2)
+
+    grid.addWidget(QLabel("Undo Style:"), 5, 0)
+    UNDO_STYLE_MAP = {
+        "Full Snapshot Revert": "full_snapshot",
+        "Per-Field Revert": "per_field",
+        "In-Editor Only": "editor_only",
+    }
+    undo_style_combo = QComboBox()
+    undo_style_combo.addItems(list(UNDO_STYLE_MAP.keys()))
+    current_style = config.get("undo_style", "per_field")
+    for label, value in UNDO_STYLE_MAP.items():
+        if value == current_style:
+            undo_style_combo.setCurrentText(label)
+            break
+    grid.addWidget(undo_style_combo, 5, 1)
+
+    undo_style_help = QLabel(
+        "<b>Full Snapshot Revert</b>: Ctrl+Z reverts all fields to their state "
+        "when the editor was opened.<br>"
+        "<b>Per-Field Revert</b>: Ctrl+Z reverts only the currently focused field.<br>"
+        "<b>In-Editor Only</b>: Ctrl+Z performs standard in-editor undo only."
+    )
+    undo_style_help.setWordWrap(True)
+    grid.addWidget(undo_style_help, 6, 0, 1, 2)
+
+    def _update_undo_controls(checked: bool) -> None:
+        undo_style_combo.setEnabled(checked)
+
+    enable_undo_cb.toggled.connect(_update_undo_controls)
+    _update_undo_controls(enable_undo_cb.isChecked())
+
+    # --- Other settings ---
     separate_prefs_cb = QCheckBox(
         "Keep reviewer editor preferences separate from Anki's main editor"
     )
     separate_prefs_cb.setChecked(config.get("separate_editor_preferences", False))
-    grid.addWidget(separate_prefs_cb, 5, 0, 1, 2)
-    undo_help = QLabel(
-        "Optional shortcut used by the embedded reviewer editor. Leave blank "
-        "to disable the fallback shortcut."
-    )
-    undo_help.setWordWrap(True)
-    grid.addWidget(undo_help, 6, 0, 1, 2)
+    grid.addWidget(separate_prefs_cb, 7, 0, 1, 2)
     prefs_help = QLabel(
         "When enabled, changes to color memory, tags collapse state, MathJax, "
         "image shrink, HTML closing, and paste options stay local to the "
         "embedded reviewer editor."
     )
     prefs_help.setWordWrap(True)
-    grid.addWidget(prefs_help, 7, 0, 1, 2)
+    grid.addWidget(prefs_help, 8, 0, 1, 2)
     settings_layout.addWidget(global_grp)
 
     tree = QTreeWidget()
@@ -461,10 +484,9 @@ def on_config_action(addon_manager: Any, module_name: str, on_save: Any) -> None
                 "show_outline": outline_cb.isChecked(),
                 "trigger_modifier": mod_combo.currentText(),
                 "trigger_action": act_combo.currentText(),
-                "custom_undo_shortcut": shortcut_to_text(
-                    undo_shortcut_edit.keySequence().toString(
-                        QKeySequence.SequenceFormat.PortableText
-                    )
+                "enable_undo": enable_undo_cb.isChecked(),
+                "undo_style": UNDO_STYLE_MAP.get(
+                    undo_style_combo.currentText(), "per_field"
                 ),
                 "separate_editor_preferences": separate_prefs_cb.isChecked(),
                 "exclusions": new_exclusions,
