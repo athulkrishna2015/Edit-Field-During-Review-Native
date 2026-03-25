@@ -14,7 +14,7 @@ from anki.utils import to_json_bytes
 from aqt import gui_hooks, mw
 from aqt.editor import Editor
 from aqt.qt import *
-from aqt.reviewer import Reviewer
+from aqt.reviewer import Reviewer, ReviewerBottomBar
 from aqt.utils import tooltip
 
 from . import config as cfg
@@ -541,29 +541,37 @@ class EFDRC:
     def on_webview_will_set_content(
         self, web_content: aqt.webview.WebContent, context: Optional[Any]
     ) -> None:
-        if not isinstance(context, Reviewer):
+        addon_package = mw.addonManager.addonFromModule(__name__)
+
+        if isinstance(context, Reviewer):
+            self._filter_cache.clear()
+            web_content.js.append(f"/_addons/{addon_package}/web/efdrc.js")
+            if self.config.get("show_outline", True):
+                web_content.css.append(f"/_addons/{addon_package}/web/efdrc.css")
+            js_conf = {
+                "modifier": self.config.get("trigger_modifier", "Ctrl"),
+                "action": self.config.get("trigger_action", "Click"),
+                "mode": "reviewer",
+            }
+            web_content.body += f"<script>EFDRC.setup({json.dumps(js_conf)});</script>"
             return
 
-        self._filter_cache.clear()
-        addon_package = mw.addonManager.addonFromModule(__name__)
-        web_content.js.append(f"/_addons/{addon_package}/web/efdrc.js")
-        if self.config.get("show_outline", True):
-            web_content.css.append(f"/_addons/{addon_package}/web/efdrc.css")
-        js_conf = {
-            "modifier": self.config.get("trigger_modifier", "Ctrl"),
-            "action": self.config.get("trigger_action", "Click"),
-        }
-        web_content.body += f"<script>EFDRC.setup({json.dumps(js_conf)});</script>"
+        if isinstance(context, ReviewerBottomBar):
+            web_content.js.append(f"/_addons/{addon_package}/web/efdrc.js")
+            js_conf = {"mode": "bottom"}
+            web_content.body += f"<script>EFDRC.setup({json.dumps(js_conf)});</script>"
 
     def on_js_message(
         self, handled: Tuple[bool, Any], message: str, context: Any
     ) -> Tuple[bool, Any]:
-        if (
-            message == "edit"
-            and isinstance(context, Reviewer)
-            and self.open_image_occlusion_editor()
+        if message == "edit" and isinstance(context, Reviewer):
+            if self.open_image_occlusion_editor():
+                return (True, None)
+        if message == "EFDRC!edit_native" and isinstance(
+            context, (Reviewer, ReviewerBottomBar)
         ):
-            return (True, None)
+            if self._open_native_reviewer_editor():
+                return (True, None)
         if message.startswith("EFDRC!edit#") and isinstance(context, Reviewer):
             try:
                 self.show_editor(int(message.split("#")[1]))
@@ -577,7 +585,7 @@ class EFDRC:
     ) -> None:
         if state != "review":
             return
-        replaced_e = replaced_kr = False
+        replaced_e = replaced_kr = replaced_n = replaced_kr_native = False
         for i, (key, fn) in enumerate(shortcuts):
             if key == "e":
                 shortcuts[i] = (key, self._on_review_edit_shortcut)
@@ -585,11 +593,21 @@ class EFDRC:
             elif key == "ㄷ":
                 shortcuts[i] = (key, self._on_review_edit_shortcut)
                 replaced_kr = True
-        
+            elif key == "n":
+                shortcuts[i] = (key, self._on_review_native_edit_shortcut)
+                replaced_n = True
+            elif key == "ㅜ":
+                shortcuts[i] = (key, self._on_review_native_edit_shortcut)
+                replaced_kr_native = True
+
         if not replaced_e:
             shortcuts.append(("e", self._on_review_edit_shortcut))
         if not replaced_kr:
             shortcuts.append(("ㄷ", self._on_review_edit_shortcut))
+        if not replaced_n:
+            shortcuts.append(("n", self._on_review_native_edit_shortcut))
+        if not replaced_kr_native:
+            shortcuts.append(("ㅜ", self._on_review_native_edit_shortcut))
 
     def _on_review_edit_shortcut(self) -> None:
         if self._editor_is_visible():
@@ -598,6 +616,24 @@ class EFDRC:
         if self.open_image_occlusion_editor():
             return
         mw.onEditCurrent()
+
+    def _open_native_reviewer_editor(self) -> bool:
+        if self._editor_is_visible():
+            self.schedule_editor_refocus()
+            return True
+        if self.open_image_occlusion_editor():
+            return True
+
+        reviewer = getattr(mw, "reviewer", None)
+        card = reviewer.card if reviewer and reviewer.card else None
+        if not card:
+            return False
+
+        self.show_editor(utils.fallback_field_index_for_card(card, self.config))
+        return True
+
+    def _on_review_native_edit_shortcut(self) -> None:
+        self._open_native_reviewer_editor()
 
     def on_state_did_change(self, new_state: str, old_state: str) -> None:
         if new_state == "review":
