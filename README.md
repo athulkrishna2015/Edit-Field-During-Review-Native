@@ -55,6 +55,13 @@ Access the configuration via either **Tools > Add-ons > EFDRN > Config** or **To
 - **Closing the editor**: Use **Done**, `Ctrl+Enter`, or `Esc` to save your changes and return to review.
 - **Undo behavior**: By default, `Ctrl+Z` uses the embedded editor's normal undo. If **Custom Undo** is enabled, `Ctrl+Z` uses the selected undo style instead. `Ctrl+Y` continues to work for redo.
 
+---
+## Support
+
+If you find this add-on useful, please consider supporting its development:
+
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/D1D01W6NQT)
+
 ## Change Log
 
 ### 25/03/2026

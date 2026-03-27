@@ -9,6 +9,9 @@ from aqt.qt import *
 
 from . import utils
 
+from aqt.utils import qconnect
+from aqt.utils import qconnect, openLink
+from aqt.webview import AnkiWebView
 
 MODEL_ID_ROLE = int(Qt.ItemDataRole.UserRole)
 ENTRY_KIND_ROLE = int(Qt.ItemDataRole.UserRole) + 1
@@ -196,6 +199,36 @@ def copy_support_value(value: str, label: str) -> None:
         clipboard.setText(value)
         tooltip(f"Copied {label}")
 
+# Ko-fi Widget (Embedded Script)
+def _kofi_widget_html() -> str:
+    return """
+<html>
+<head>
+<style>
+  body { background-color: transparent; margin: 0; padding: 0; overflow: hidden; display:flex; align-items:center; justify-content:center; }
+</style>
+<script type='text/javascript' src='https://storage.ko-fi.com/cdn/widget/Widget_2.js'></script>
+<script type='text/javascript'>
+  kofiwidget2.init('Support me on Ko-fi', '#72a4f2', 'D1D01W6NQT');
+  kofiwidget2.draw();
+</script>
+</head>
+<body></body>
+</html>
+"""
+
+def make_kofi_widget(parent: QWidget) -> AnkiWebView:
+    webview = AnkiWebView(parent)
+    webview.setFixedHeight(70)  # Allow more vertical space so the button isn't clipped
+    webview.setSizePolicy(
+        QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
+    )
+    webview.setContentsMargins(0, 0, 0, 0)
+    webview.setMinimumWidth(240)
+    webview.setHtml(_kofi_widget_html())
+    return webview
+
+
 
 def make_support_card(entry: dict[str, str]) -> QGroupBox:
     group = QGroupBox(entry["title"])
@@ -254,6 +287,10 @@ def build_support_tab() -> QWidget:
     content_layout = QVBoxLayout(content)
     content_layout.setContentsMargins(12, 12, 12, 12)
     content_layout.setSpacing(12)
+
+    content_layout.addWidget(
+        make_kofi_widget(content), 0, Qt.AlignmentFlag.AlignHCenter
+    )
 
     intro = QLabel(
         "If this add-on helps your workflow, you can support its development "
