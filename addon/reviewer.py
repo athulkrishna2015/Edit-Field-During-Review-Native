@@ -493,7 +493,10 @@ class EFDRC:
         if self.refocus_timer.isActive():
             self.refocus_timer.stop()
         if self.done_btn:
-            self.done_btn.setEnabled(True)
+            try:
+                self.done_btn.setEnabled(True)
+            except RuntimeError:
+                pass
 
     def open_editor_for_current_card(self) -> bool:
         reviewer = getattr(mw, "reviewer", None)
@@ -863,7 +866,10 @@ class EFDRC:
         self._set_editor_note(note, field_idx, card)
         self.schedule_editor_refocus(field_idx, delay_ms=120, force=True)
         if self.done_btn:
-            self.done_btn.setEnabled(True)
+            try:
+                self.done_btn.setEnabled(True)
+            except RuntimeError:
+                pass
 
     def hide_editor(self, reload: bool = True) -> None:
         self.reload_after_save = reload and getattr(mw, "state", None) == "review"
@@ -879,7 +885,10 @@ class EFDRC:
 
         self._set_shortcuts_enabled(False)
         if self.done_btn:
-            self.done_btn.setEnabled(False)
+            try:
+                self.done_btn.setEnabled(False)
+            except RuntimeError:
+                pass
         if self.editor_widget:
             self.editor_widget.hide()
 

@@ -68,6 +68,7 @@ If you find this add-on useful, please consider supporting its development:
 
 - **Cloze Bug Fix**: Fixed a critical issue where Anki would incorrectly default to displaying Cloze 1 deletions for Cloze 2 and above when using the embedded editor.
 - **Native Config GUI**: Enabled standard HTML-based configuration from Anki's Add-on manager through a new `config.md` fallback, while safely maintaining the advanced Qt GUI dialog.
+- **Crash Fix**: Resolved a `RuntimeError` that occurred when closing the profile, improving shutdown stability.
 
 ### 25/03/2026
 
