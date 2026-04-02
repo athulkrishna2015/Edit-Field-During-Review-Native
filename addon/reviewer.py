@@ -65,7 +65,7 @@ class EFDRC:
         anki.hooks.field_filter.append(self.on_field_filter)
         gui_hooks.webview_will_set_content.append(self.on_webview_will_set_content)
 
-        mw.addonManager.setConfigAction(self.addon_name, self.on_config_action)
+        # mw.addonManager.setConfigAction(self.addon_name, self.on_config_action)
 
         # Add to Tools menu
         action = QAction("EFDRN Configuration", mw)
@@ -961,6 +961,10 @@ if not getattr(anki.template.TemplateRenderContext._partially_render, "_efdrn_wr
             except Exception:
                 modified_template = None
             if modified_template is not None:
+                # Force the template's internal ord to match the card's actual ord.
+                # This prevents Anki's backend from incorrectly assuming it's rendering Cloze 1
+                # (which happens because Cloze templates inherently have ord=0).
+                modified_template["ord"] = self._card.ord
                 out = self._col._backend.render_uncommitted_card_legacy(
                     note=self._note._to_backend_note(),
                     card_ord=self._card.ord,

@@ -64,6 +64,11 @@ If you find this add-on useful, please consider supporting its development:
 
 ## Change Log
 
+### 02/04/2026
+
+- **Cloze Bug Fix**: Fixed a critical issue where Anki would incorrectly default to displaying Cloze 1 deletions for Cloze 2 and above when using the embedded editor.
+- **Native Config GUI**: Enabled standard HTML-based configuration from Anki's Add-on manager through a new `config.md` fallback, while safely maintaining the advanced Qt GUI dialog.
+
 ### 25/03/2026
 
 - **Flicker Fix**: The embedded editor no longer causes the review screen to flicker or blank out while saving or redrawing the current card.
