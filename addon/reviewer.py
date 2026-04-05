@@ -140,7 +140,18 @@ class EFDRC:
 
     def setup_ui(self) -> None:
         if self.editor_widget:
-            return
+            try:
+                self.editor_widget.isHidden()
+                return
+            except RuntimeError:
+                self.editor_widget = None
+                self.editor_container = None
+                if self.editor:
+                    try:
+                        self.editor.cleanup()
+                    except Exception:
+                        pass
+                    self.editor = None
 
         central = mw.centralWidget()
         if not central:
@@ -477,7 +488,20 @@ class EFDRC:
         return None
 
     def _editor_is_visible(self) -> bool:
-        return bool(self.editor_widget and not self.editor_widget.isHidden())
+        if not self.editor_widget:
+            return False
+        try:
+            return not self.editor_widget.isHidden()
+        except RuntimeError:
+            self.editor_widget = None
+            self.editor_container = None
+            if self.editor:
+                try:
+                    self.editor.cleanup()
+                except Exception:
+                    pass
+                self.editor = None
+            return False
 
     def _set_review_screen_visible(self, visible: bool) -> None:
         web = getattr(mw, "web", None)
@@ -686,10 +710,16 @@ class EFDRC:
         self._deactivate_reviewer_editor_preferences()
         self._set_review_screen_visible(True)
         if self.editor:
-            self.editor.cleanup()
+            try:
+                self.editor.cleanup()
+            except Exception:
+                pass
             self.editor = None
         if self.editor_widget:
-            self.editor_widget.deleteLater()
+            try:
+                self.editor_widget.deleteLater()
+            except RuntimeError:
+                pass
             self.editor_widget = None
             self.editor_container = None
 
@@ -816,7 +846,10 @@ class EFDRC:
             if not self._editor_is_visible():
                 self._deactivate_reviewer_editor_preferences()
         if self.editor_widget:
-            self.editor_widget.hide()
+            try:
+                self.editor_widget.hide()
+            except RuntimeError:
+                pass
 
     def _set_editor_note(self, note: Note, field_idx: int, card: Card) -> None:
         assert self.editor is not None
@@ -862,7 +895,10 @@ class EFDRC:
         self._suspend_main_window_undo_shortcuts()
         self._set_shortcuts_enabled(True)
         self._set_review_screen_visible(False)
-        self.editor_widget.show()
+        try:
+            self.editor_widget.show()
+        except RuntimeError:
+            pass
         self._set_editor_note(note, field_idx, card)
         self.schedule_editor_refocus(field_idx, delay_ms=120, force=True)
         if self.done_btn:
@@ -890,7 +926,10 @@ class EFDRC:
             except RuntimeError:
                 pass
         if self.editor_widget:
-            self.editor_widget.hide()
+            try:
+                self.editor_widget.hide()
+            except RuntimeError:
+                pass
 
         # Show reviewer immediately to reduce flicker during the save process
         self._set_review_screen_visible(True)

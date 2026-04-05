@@ -64,6 +64,10 @@ If you find this add-on useful, please consider supporting its development:
 
 ## Change Log
 
+### 05/04/2026
+
+- **Crash Fix**: Resolved a `RuntimeError` regarding C++ object deletion when interacting with the hidden editor widget (e.g., jumping between cards or using `N` shortcut).
+
 ### 02/04/2026
 
 - **Cloze Bug Fix**: Fixed a critical issue where Anki would incorrectly default to displaying Cloze 1 deletions for Cloze 2 and above when using the embedded editor.
