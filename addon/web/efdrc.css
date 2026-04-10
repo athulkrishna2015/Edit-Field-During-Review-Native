@@ -1,3 +1,7 @@
+abbr[data-efdrc-idx] {
+    text-decoration: none !important;
+}
+
 .efdrc-active [data-efdrc-idx],
 .efdrc-active #io-overlay,
 .efdrc-active #io-wrapper,

@@ -551,7 +551,7 @@ class EFDRC:
             idx = next((i for i, fld in enumerate(flds) if fld["name"] == field), 0)
             # Add a class if the field is empty to help with selection
             cls = "efdrc-empty" if not txt.strip() else ""
-            return f'<span data-efdrc-idx="{idx}" class="{cls}">{txt}</span>'
+            return f'<abbr data-efdrc-idx="{idx}" class="{cls}">{txt}</abbr>'
         except Exception:
             return txt
 
