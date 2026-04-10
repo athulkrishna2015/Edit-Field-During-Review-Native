@@ -65,7 +65,7 @@ class EFDRC:
         anki.hooks.field_filter.append(self.on_field_filter)
         gui_hooks.webview_will_set_content.append(self.on_webview_will_set_content)
 
-        # mw.addonManager.setConfigAction(self.addon_name, self.on_config_action)
+        mw.addonManager.setConfigAction(self.addon_name, self.on_config_action)
 
         # Add to Tools menu
         action = QAction("EFDRN Configuration", mw)

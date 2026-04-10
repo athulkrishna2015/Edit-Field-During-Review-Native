@@ -67,6 +67,7 @@ If you find this add-on useful, please consider supporting its development:
 ### 10/04/2026
 
 - **Visual Fix**: Replaced the field box wrapper with a compliant standard HTML `<abbr>` tag to prevent the blue dashed editing outline from prematurely cutting off mid-sentence or failing to wrap block elements (like tables) when encountering stray HTML tags.
+- **Unified Config Dialog**: The Add-ons Config button now opens the same custom EFDRN Configuration dialog instead of showing a raw JSON editor.
 
 ### 05/04/2026
 
