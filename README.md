@@ -64,6 +64,10 @@ If you find this add-on useful, please consider supporting its development:
 
 ## Change Log
 
+### 10/04/2026
+
+- **Visual Fix**: Replaced the field box wrapper with a compliant standard HTML `<abbr>` tag to prevent the blue dashed editing outline from prematurely cutting off mid-sentence or failing to wrap block elements (like tables) when encountering stray HTML tags.
+
 ### 05/04/2026
 
 - **Crash Fix**: Resolved a `RuntimeError` regarding C++ object deletion when interacting with the hidden editor widget (e.g., jumping between cards or using `N` shortcut).
