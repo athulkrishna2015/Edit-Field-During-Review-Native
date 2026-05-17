@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from aqt.qt import *
+from aqt.qt import QApplication
 from .log_handler import get_log_content, clear_logs, connect_log_signal
 
 class LogTab(QWidget):
@@ -22,6 +23,10 @@ class LogTab(QWidget):
         refresh_btn = QPushButton("Refresh")
         refresh_btn.clicked.connect(self._refresh_logs)
         btn_row.addWidget(refresh_btn)
+
+        copy_btn = QPushButton("Copy")
+        copy_btn.clicked.connect(self._on_copy)
+        btn_row.addWidget(copy_btn)
 
         clear_btn = QPushButton("Clear")
         clear_btn.clicked.connect(self._on_clear)
@@ -52,6 +57,13 @@ class LogTab(QWidget):
     def _on_clear(self):
         clear_logs()
         self.log_display.clear()
+
+    def _on_copy(self):
+        clipboard = QApplication.clipboard()
+        if clipboard:
+            clipboard.setText(self.log_display.toPlainText())
+            from aqt.utils import tooltip
+            tooltip("Logs copied to clipboard")
 
     def showEvent(self, event):
         super().showEvent(event)

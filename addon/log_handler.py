@@ -46,8 +46,7 @@ def clear_logs():
 
 def setup_file_logging():
     try:
-        addon_package = mw.addonManager.addonFromModule(__name__)
-        addon_path = mw.addonManager.addon_path(addon_package)
+        addon_path = os.path.dirname(__file__)
         log_path = os.path.join(addon_path, LOG_FILE_NAME)
         file_handler = logging.FileHandler(log_path, encoding="utf-8")
         file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
