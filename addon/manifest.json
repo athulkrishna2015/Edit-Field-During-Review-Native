@@ -1,8 +1,8 @@
 {
   "package": "efdrn",
   "name": "Edit Field During Review (Native)",
-  "version": "7.2.8",
-  "human_version": "7.2.8",
+  "version": "7.3.0",
+  "human_version": "7.3.0",
   "conflicts": [
     "1020366288"
   ]

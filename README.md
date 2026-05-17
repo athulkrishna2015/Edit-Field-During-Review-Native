@@ -45,10 +45,12 @@ Access the configuration via either **Tools > Add-ons > EFDRN > Config** or **To
 - **Undo Style**: Choose between `Per-Field Revert` (reverts only the focused field, default), `Full Snapshot Revert` (reverts all fields), or `In-Editor Only` (standard Ctrl+Z behavior).
 - **Separate Reviewer Preferences**: When enabled, the embedded reviewer editor keeps its own colors, tag collapse state, MathJax/image/HTML toggle state, and paste behavior without changing Anki's main editor preferences.
 - **Exclusions**: Use the tree view to disable editing for specific Note Types, Templates, or Fields. Exclusions apply to both auto-enabled fields and explicit `{{edit:...}}` fields. Use the **Enable All** and **Disable All** buttons for bulk management.
-- **Support Tab**: The config dialog also includes a `Support` tab with large QR codes and copy buttons for UPI, BTC, and ETH.
+- **Support Tab**: The config dialog also includes a `Support` tab with large QR codes and copy buttons for UPI, BTC, and ETH. This tab automatically opens once after an update to notify you of new features.
+- **Log Tab**: A new `Log` tab in the configuration dialog provides real-time activity tracking and troubleshooting information.
 
 ## Troubleshooting
 
+- **Log Tab**: If you encounter issues, check the **Log** tab in the configuration dialog for real-time error messages and activity logs.
 - **Can't edit during review**: Auto-enable is on by default. If you turned it off, add `{{edit:FieldName}}` to the fields you want clickable.
 - **Image Occlusion cards**: Use the optional **Edit (N)** button or the **N** shortcut to open the embedded editor. `Ctrl+Click` is currently unreliable on Image Occlusion cards.
 - **Editor shortcuts**: Standard native editor shortcuts such as `Ctrl+B` and `Ctrl+Shift+C` work inside the embedded editor.
@@ -63,6 +65,14 @@ If you find this add-on useful, please consider supporting its development:
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/D1D01W6NQT)
 
 ## Change Log
+
+### 18/05/2026 (v7.3.0)
+
+- **Log Tab**: Added a dedicated `Log` tab in the configuration dialog for real-time activity tracking and easier troubleshooting.
+- **Support Tab Auto-Open**: The Support tab now opens automatically once after an update to highlight new changes (respecting the "I have supported this addon" checkbox).
+- **Live Updates**: Log entries now update in real-time as they are generated.
+- **Image Fix**: Resolved an "Image not found" error that occurred when loading donation QR codes in certain installation environments.
+- **Stability**: Refactored module loading and dynamic package resolution for better compatibility with development environments.
 
 ### 10/04/2026
 

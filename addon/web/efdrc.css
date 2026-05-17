@@ -1,4 +1,4 @@
-abbr[data-efdrc-idx] {
+span[data-efdrc-idx] {
     text-decoration: none !important;
 }
 
@@ -8,23 +8,32 @@ abbr[data-efdrc-idx] {
 .efdrc-active #io-header,
 .efdrc-active #io-footer,
 .efdrc-active #io-image {
-    outline: 1px dashed #0078d4;
-    cursor: pointer;
+    outline: 1px dashed #0078d4 !important;
+    outline-offset: 1px !important;
+    cursor: pointer !important;
 }
+
 .efdrc-active [data-efdrc-idx]:hover,
 .efdrc-active #io-overlay:hover,
 .efdrc-active #io-wrapper:hover,
 .efdrc-active #io-header:hover,
 .efdrc-active #io-footer:hover,
 .efdrc-active #io-image:hover {
-    background-color: rgba(0, 120, 212, 0.1);
+    background-color: rgba(0, 120, 212, 0.1) !important;
+}
+
+.efdrc-active [data-efdrc-idx].efdrc-empty {
+    display: inline-block !important;
+    min-height: 1.2em !important;
+    min-width: 1em !important;
+    vertical-align: middle !important;
 }
 
 .efdrc-active [data-efdrc-idx].efdrc-empty::after {
-    content: " [empty field] ";
-    opacity: 0.6;
-    font-size: 0.85em;
-    font-style: italic;
-    color: #0078d4;
-    cursor: pointer;
+    content: " [empty field] " !important;
+    opacity: 0.6 !important;
+    font-size: 0.85em !important;
+    font-style: italic !important;
+    color: #0078d4 !important;
+    cursor: pointer !important;
 }

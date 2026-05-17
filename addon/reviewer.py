@@ -20,6 +20,7 @@ from aqt.utils import tooltip
 from . import config as cfg
 from . import utils
 from .editor import EmbeddedReviewerEditor
+from .log_handler import logger
 
 
 class EFDRC:
@@ -547,13 +548,16 @@ class EFDRC:
 
     def _wrap(self, txt: str, field: str, ctx: TemplateRenderContext) -> str:
         try:
+            txt = txt or ""
             flds = ctx.note().model()["flds"]
             idx = next((i for i, fld in enumerate(flds) if fld["name"] == field), 0)
             # Add a class if the field is empty to help with selection
-            cls = "efdrc-empty" if not txt.strip() else ""
-            return f'<abbr data-efdrc-idx="{idx}" class="{cls}">{txt}</abbr>'
+            stripped = txt.strip().lower()
+            is_empty = not stripped or stripped in ("<br>", "<br/>", "<br />", "<div></div>")
+            cls = "efdrc-empty" if is_empty else ""
+            return f'<span data-efdrc-idx="{idx}" class="{cls}">{txt}</span>'
         except Exception:
-            return txt
+            return txt or ""
 
     def on_field_filter(
         self, txt: str, field: str, filt: str, ctx: TemplateRenderContext
@@ -796,8 +800,10 @@ class EFDRC:
             kwargs = {}
             if editor_mode is not None and hasattr(editor_mode, "EDIT_CURRENT"):
                 kwargs["editor_mode"] = editor_mode.EDIT_CURRENT
+            logger.debug("Creating EmbeddedReviewerEditor (parentWindow style)")
             return EmbeddedReviewerEditor(mw, self.editor_container, mw, **kwargs)
 
+        logger.debug("Creating EmbeddedReviewerEditor (traditional style)")
         return EmbeddedReviewerEditor(mw, self.editor_container, note)
 
     def _ensure_editor_ready(self, note: Optional[Note] = None) -> None:
