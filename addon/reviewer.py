@@ -2,6 +2,7 @@
 
 import inspect
 import json
+import re
 from typing import Any, Dict, Optional, Tuple
 
 import anki
@@ -551,8 +552,20 @@ class EFDRC:
             txt = txt or ""
             flds = ctx.note().model()["flds"]
             idx = next((i for i, fld in enumerate(flds) if fld["name"] == field), 0)
+            
             # Add a class if the field is empty to help with selection
-            stripped = txt.strip().lower()
+            # We ignore hidden AI-Hints blocks which might be present but visually empty
+            check_txt = txt
+            if "ai-hints-json" in check_txt.lower():
+                # Remove hidden AI-Hints metadata blocks for emptiness check
+                check_txt = re.sub(
+                    r'<div[^>]*class=["\']ai-hints-json["\'][^>]*>.*?</div>',
+                    "",
+                    check_txt,
+                    flags=re.DOTALL | re.IGNORECASE,
+                )
+
+            stripped = check_txt.strip().lower()
             is_empty = not stripped or stripped in ("<br>", "<br/>", "<br />", "<div></div>")
             cls = "efdrc-empty" if is_empty else ""
             return f'<span data-efdrc-idx="{idx}" class="{cls}">{txt}</span>'
