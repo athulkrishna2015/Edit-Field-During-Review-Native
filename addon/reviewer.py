@@ -1031,14 +1031,10 @@ class EFDRC:
             if name == "AddCards" and instance:
                 try:
                     # Update deck to current review card's deck or currently selected deck/subdeck
-                    if getattr(mw, "col", None) is not None:
-                        reviewer = getattr(mw, "reviewer", None)
-                        current_card = getattr(reviewer, "card", None)
-                        if getattr(mw, "state", None) == "review" and current_card:
-                            deck_id = current_card.current_deck_id()
-                        else:
-                            deck_id = mw.col.decks.selected()
-
+                    reviewer = getattr(mw, "reviewer", None)
+                    current_card = getattr(reviewer, "card", None)
+                    if getattr(mw, "state", None) == "review" and current_card:
+                        deck_id = current_card.current_deck_id()
                         if hasattr(instance, "deck_chooser"):
                             instance.deck_chooser.selected_deck_id = deck_id
                             if hasattr(instance.deck_chooser, "on_deck_changed") and instance.deck_chooser.on_deck_changed:
@@ -1194,5 +1190,20 @@ if not getattr(anki.template.TemplateRenderContext._partially_render, "_efdrn_wr
 
     _efdrn_partially_render._efdrn_wrapped = True  # type: ignore[attr-defined]
     anki.template.TemplateRenderContext._partially_render = _efdrn_partially_render
+
+if not getattr(aqt.addcards.AddCards.on_notetype_change, "_efdrn_wrapped", False):
+    _efdrn_original_on_notetype_change = aqt.addcards.AddCards.on_notetype_change
+
+    def _efdrn_addcards_on_notetype_change(
+        self: aqt.addcards.AddCards, notetype_id: Any, update_deck: bool = True
+    ) -> None:
+        reviewer = getattr(mw, "reviewer", None)
+        current_card = getattr(reviewer, "card", None)
+        if getattr(mw, "state", None) == "review" and current_card and getattr(mw, "col", None) is not None:
+            update_deck = False
+        _efdrn_original_on_notetype_change(self, notetype_id, update_deck)
+
+    _efdrn_addcards_on_notetype_change._efdrn_wrapped = True  # type: ignore[attr-defined]
+    aqt.addcards.AddCards.on_notetype_change = _efdrn_addcards_on_notetype_change
 
 mw.addonManager.setWebExports(__name__, r"web/.*")
