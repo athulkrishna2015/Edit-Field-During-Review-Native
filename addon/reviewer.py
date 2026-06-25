@@ -55,6 +55,8 @@ class EFDRC:
         self.refocus_timer.setSingleShot(True)
         qconnect(self.refocus_timer.timeout, self._restore_editor_focus)
 
+        self.profile_is_closing = False
+        self.add_window_last_deck_id = None
         self.load_config()
         self._filter_cache: Dict[str, bool] = {}
 
@@ -64,6 +66,8 @@ class EFDRC:
         gui_hooks.state_shortcuts_will_change.append(self.on_state_shortcuts_will_change)
         gui_hooks.state_did_change.append(self.on_state_did_change)
         gui_hooks.profile_will_close.append(self.on_profile_will_close)
+        gui_hooks.profile_did_open.append(self.on_profile_did_open)
+        gui_hooks.add_cards_did_init.append(self.on_add_cards_did_init)
         anki.hooks.field_filter.append(self.on_field_filter)
         gui_hooks.webview_will_set_content.append(self.on_webview_will_set_content)
 
@@ -73,6 +77,13 @@ class EFDRC:
         action = QAction("EFDRN Configuration", mw)
         qconnect(action.triggered, self.on_config_action)
         mw.form.menuTools.addAction(action)
+
+        # Patch dialog manager for preloading AddCards
+        self._patch_dialogs_open()
+
+        # If profile/collection is already loaded (e.g. after addon reload)
+        if getattr(mw, "col", None) is not None:
+            self.schedule_add_window_preload(delay_ms=500)
 
         if getattr(mw, "state", None) == "review":
             self.schedule_editor_preload()
@@ -88,11 +99,13 @@ class EFDRC:
             "show_review_button": False,
             "separate_editor_preferences": True,
             "reviewer_editor_preferences": {},
+            "preload_add_window": True,
         }
         self.config.setdefault("enable_undo", False)
         self.config.setdefault("undo_style", "per_field")
         self.config.setdefault("show_review_button", False)
         self.config.setdefault("separate_editor_preferences", True)
+        self.config.setdefault("preload_add_window", True)
         self.config.setdefault("exclusions_v2", {})
         reviewer_prefs = self.config.setdefault("reviewer_editor_preferences", {})
         for key, value in cfg.default_editor_preferences().items():
@@ -722,6 +735,7 @@ class EFDRC:
             self.hide_editor(reload=False)
 
     def on_profile_will_close(self) -> None:
+        self.profile_is_closing = True
         self.cancel_editor_preload()
         self.hide_editor(reload=False)
         self._deactivate_reviewer_editor_preferences()
@@ -741,6 +755,22 @@ class EFDRC:
             self.editor_container = None
 
     def on_reviewer_rendered(self, _card: Card) -> None:
+        # Update AddCards deck if visible
+        try:
+            add_cards = aqt.dialogs._dialogs["AddCards"][1]
+            if add_cards and add_cards.isVisible():
+                reviewer = getattr(mw, "reviewer", None)
+                current_card = getattr(reviewer, "card", None)
+                if current_card and getattr(mw, "col", None) is not None:
+                    deck_id = current_card.current_deck_id()
+                    if hasattr(add_cards, "deck_chooser"):
+                        if add_cards.deck_chooser.selected_deck_id != deck_id:
+                            add_cards.deck_chooser.selected_deck_id = deck_id
+                            if hasattr(add_cards.deck_chooser, "on_deck_changed") and add_cards.deck_chooser.on_deck_changed:
+                                add_cards.deck_chooser.on_deck_changed(deck_id)
+        except Exception as e:
+            logger.error(f"Error updating AddCards deck to match reviewer: {e}")
+
         if not self._editor_is_visible():
             return
 
@@ -988,6 +1018,126 @@ class EFDRC:
                 reviewer._showQuestion()
             elif reviewer.state == "answer":
                 reviewer._showAnswer()
+
+    def _patch_dialogs_open(self) -> None:
+        if hasattr(aqt.dialogs, "_efdrn_wrapped"):
+            return
+
+        original_open = aqt.dialogs.open
+        original_mark_closed = aqt.dialogs.markClosed
+
+        def patched_open(name: str, *args: Any, **kwargs: Any) -> Any:
+            instance = original_open(name, *args, **kwargs)
+            if name == "AddCards" and instance:
+                try:
+                    # Update deck to current review card's deck or currently selected deck/subdeck
+                    if getattr(mw, "col", None) is not None:
+                        reviewer = getattr(mw, "reviewer", None)
+                        current_card = getattr(reviewer, "card", None)
+                        if getattr(mw, "state", None) == "review" and current_card:
+                            deck_id = current_card.current_deck_id()
+                        else:
+                            deck_id = mw.col.decks.selected()
+
+                        if hasattr(instance, "deck_chooser"):
+                            instance.deck_chooser.selected_deck_id = deck_id
+                            if hasattr(instance.deck_chooser, "on_deck_changed") and instance.deck_chooser.on_deck_changed:
+                                instance.deck_chooser.on_deck_changed(deck_id)
+                    
+                    if not instance.isVisible():
+                        instance.show()
+                    instance.raise_()
+                    instance.activateWindow()
+                except Exception as e:
+                    logger.error(f"Error showing preloaded AddCards: {e}")
+            return instance
+
+        def patched_mark_closed(name: str) -> None:
+            original_mark_closed(name)
+            if name == "AddCards":
+                self.schedule_add_window_preload(delay_ms=1000)
+
+        patched_open._efdrn_wrapped = True  # type: ignore[attr-defined]
+        aqt.dialogs.open = patched_open
+        aqt.dialogs.markClosed = patched_mark_closed
+
+
+
+    def on_profile_did_open(self) -> None:
+        self.profile_is_closing = False
+        self.add_window_last_deck_id = None
+        self.schedule_add_window_preload(delay_ms=1000)
+
+    def schedule_add_window_preload(self, delay_ms: int = 1000) -> None:
+        if not self.config.get("preload_add_window", True):
+            return
+        if not getattr(mw, "col", None):
+            return
+        if getattr(self, "profile_is_closing", False):
+            return
+        if aqt.dialogs._dialogs["AddCards"][1] is not None:
+            return
+
+        QTimer.singleShot(delay_ms, self._preload_add_window)
+
+    def _preload_add_window(self) -> None:
+        if not self.config.get("preload_add_window", True):
+            return
+        if not getattr(mw, "col", None):
+            return
+        if getattr(self, "profile_is_closing", False):
+            return
+        if aqt.dialogs._dialogs["AddCards"][1] is not None:
+            return
+
+        logger.debug("Preloading AddCards window...")
+        has_local_show = "show" in aqt.addcards.AddCards.__dict__
+        original_show = aqt.addcards.AddCards.show
+        
+        aqt.addcards.AddCards.show = lambda self: None
+        
+        original_deck_id = None
+        if getattr(mw, "col", None) is not None:
+            try:
+                original_deck_id = mw.col.decks.selected()
+            except Exception as e:
+                logger.error(f"Failed to get current deck ID before preload: {e}")
+        
+        try:
+            instance = aqt.addcards.AddCards(mw)
+            aqt.dialogs._dialogs["AddCards"][1] = instance
+        except Exception as e:
+            logger.error(f"Failed to preload AddCards: {e}")
+        finally:
+            if has_local_show:
+                aqt.addcards.AddCards.show = original_show
+            else:
+                try:
+                    del aqt.addcards.AddCards.show
+                except AttributeError:
+                    pass
+            if original_deck_id is not None:
+                try:
+                    mw.col.decks.select(original_deck_id)
+                except Exception as e:
+                    logger.error(f"Failed to restore current deck ID after preload: {e}")
+
+    def on_add_cards_did_init(self, add_cards: aqt.addcards.AddCards) -> None:
+        original_close = add_cards._close
+        
+        def custom_close() -> None:
+            if getattr(self, "profile_is_closing", False):
+                original_close()
+            else:
+                if hasattr(add_cards, "deck_chooser"):
+                    self.add_window_last_deck_id = add_cards.deck_chooser.selected_deck_id
+                add_cards.hide()
+                try:
+                    add_cards._load_new_note()
+                except Exception as e:
+                    logger.error(f"Error resetting note on close: {e}")
+                    
+        add_cards._close = custom_close
 
 
 efdrc = EFDRC()

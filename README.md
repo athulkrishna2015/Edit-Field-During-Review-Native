@@ -66,6 +66,12 @@ If you find this add-on useful, please consider supporting its development:
 
 ## Change Log
 
+### 25/06/2026 (v7.4.0)
+
+- **Preloading Add Cards**: Added a configuration option to preload the Add Cards window in the background, making it open instantaneously.
+- **Deck Selection Preservation**: Fixed Anki defaulting to a preloaded deck on startup. The addon now preserves and restores the last opened deck when preloading in the background.
+- **Smart Deck/Subdeck Selection**: Opening the Add Cards window from the deck browser list or deck overview screen now correctly selects the active deck or subdeck.
+
 ### 18/05/2026 (v7.3.0)
 
 - **Log Tab**: Added a dedicated `Log` tab in the configuration dialog for real-time activity tracking and easier troubleshooting.

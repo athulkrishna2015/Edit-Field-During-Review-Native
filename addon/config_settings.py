@@ -93,6 +93,11 @@ class SettingsTab(QWidget):
         )
         prefs_help.setWordWrap(True)
         grid.addWidget(prefs_help, 9, 0, 1, 2)
+
+        self.preload_add_cb = QCheckBox("Preload Add Cards window for faster opening")
+        self.preload_add_cb.setChecked(self.config.get("preload_add_window", True))
+        grid.addWidget(self.preload_add_cb, 10, 0, 1, 2)
+
         layout.addWidget(global_grp)
 
         self.tree = QTreeWidget()
@@ -211,6 +216,7 @@ class SettingsTab(QWidget):
             "enable_undo": self.enable_undo_cb.isChecked(),
             "undo_style": UNDO_STYLE_MAP.get(self.undo_style_combo.currentText(), "per_field"),
             "separate_editor_preferences": self.separate_prefs_cb.isChecked(),
+            "preload_add_window": self.preload_add_cb.isChecked(),
             "exclusions": new_exclusions,
             "exclusions_v2": new_exclusions_v2,
         })

@@ -9,5 +9,6 @@
     "enable_undo": false,
     "undo_style": "per_field",
     "separate_editor_preferences": true,
-    "reviewer_editor_preferences": {}
+    "reviewer_editor_preferences": {},
+    "preload_add_window": true
 }
