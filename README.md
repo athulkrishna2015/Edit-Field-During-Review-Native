@@ -66,6 +66,11 @@ If you find this add-on useful, please consider supporting its development:
 
 ## Change Log
 
+### 26/06/2026 (v7.4.1)
+
+- **Note Type Deck Fix**: Fixed an issue where changing the card or note type in the Add cards window during review would trigger a deck change to the note type's default deck, resetting it from the currently reviewed card's deck.
+- **Default Behavior Preservation**: Ensured Anki's default behavior for deck selection and note type changes is preserved when not in review mode (e.g., from the deck browser or overview screen).
+
 ### 25/06/2026 (v7.4.0)
 
 - **Preloading Add Cards**: Added a configuration option to preload the Add Cards window in the background, making it open instantaneously.
