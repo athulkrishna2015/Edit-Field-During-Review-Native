@@ -34,21 +34,21 @@ All notable changes to **Edit Field During Review Native** are documented in thi
 
 ## 7.2.8 - 2026-04-10
 
-- **Visual Fix**: Field outline no longer cuts off mid-sentence or fails to wrap tables.
-- **Unified Config Dialog**: The add-on's Config button now opens the custom EFDRN Configuration dialog instead of the raw JSON editor.
+- **Visual Fix**: Replaced the field box wrapper with a compliant standard HTML `<abbr>` tag to prevent the blue dashed editing outline from prematurely cutting off mid-sentence or failing to wrap block elements (like tables) when encountering stray HTML tags.
+- **Unified Config Dialog**: The add-on's Config button now opens the same custom EFDRN Configuration dialog instead of showing a raw JSON editor.
 
 ## 7.2.6 - 2026-04-05
 
-- **Stability**: Fixes RuntimeError involving C++ PyQt widget deletions when hitting shortcuts like E or N, or during profile closure/cleanup.
+- **Crash Fix**: Resolved a `RuntimeError` regarding C++ object deletion when interacting with the hidden editor widget (e.g., jumping between cards or using the `N` shortcut).
 
 ## 7.2.5 - 2026-04-02
 
-- Fixes a RuntimeError during shutdown and updates documentation.
+- **Crash Fix**: Resolved a `RuntimeError` that occurred when closing the profile, improving shutdown stability.
 
 ## 7.2.3 - 2026-04-02
 
-- **Fix**: Fixes an issue with Cloze 2+ cards.
-- Adds native configuration setup and `config.md`.
+- **Cloze Bug Fix**: Fixed a critical issue where Anki would incorrectly default to displaying Cloze 1 deletions for Cloze 2 and above when using the embedded editor.
+- **Native Config GUI**: Enabled standard HTML-based configuration from Anki's Add-on manager through a new `config.md` fallback, while safely maintaining the advanced Qt GUI dialog.
 
 ## 7.2.1 - 2026-03-27
 
@@ -68,21 +68,32 @@ All notable changes to **Edit Field During Review Native** are documented in thi
 
 ## 7.1.1 - 2026-03-25
 
+- **Flicker Fix**: The embedded editor no longer causes the review screen to flicker or blank out while saving or redrawing the current card.
+- **Review Screen Native Button**: Added an optional **Edit (N)** button and **N** shortcut on the review screen to open the embedded editor directly. The button is disabled by default and can be enabled in config.
 - **Multiple Undo Styles**: Ctrl+Z now supports configurable undo behavior with three styles:
   - **Per-Field Revert** (default): reverts only the currently focused field
   - **Full Snapshot Revert**: reverts all fields to when editing started
   - **In-Editor Only**: standard Ctrl+Z in-editor undo
 - **Enable/Disable Undo**: New "Enable Custom Undo (Ctrl+Z)" toggle in config (disabled by default). When enabled, Ctrl+Z uses the chosen style.
 - **Config UI**: Undo Style dropdown in settings with descriptive help text.
+- **Fixed No-Setup Editing**: Rendered reviewer fields are now auto-wrapped correctly, so Auto-enable works without manually adding `edit:` to templates.
+- **Exclusions Hardened**: Disabled note types, templates, and fields now apply to explicit `{{edit:...}}` usage too, and exclusion settings survive renames by using stable internal IDs.
+- **Toolbar Simplified**: The embedded editor now focuses on the native editing flow with **Done**, native undo/redo instead of a separate restore button.
+- **Documentation Cleanup**: Updated the README, development notes, and config wording to match the current reviewer workflow.
 
 ## 7.1.0 - 2026-03-24
 
-- Documentation updates and GitHub link/installation info.
+- **Eliminated Flicker**: The review screen now remains visible during the save transition, removing the "blank screen" jump when finishing an edit.
+- **Image Occlusion Support**: Added review-screen support for opening the embedded editor on Image Occlusion cards.
+- **Architectural Cleanup**: Refactored the internal code into specialized modules (`editor`, `utils`, `config`) for better stability and faster loading on newer Anki versions.
+- **Added to Tools Menu**: Quick access to configuration via `Tools > EFDRN Configuration`.
+- **README Refresh**: Updated installation info, screenshots, and repository links.
 
 ## 7.0.1 - 2026-03-23
 
-- **Backward Compatibility**: Backward compatibility fixes.
-- **Undo**: Native Svelte Ctrl+Z routing fix.
+- **Config Persistence Fix**: Configuration now resolves consistently through the base add-on name.
+- **Empty Field Triggering**: Empty editable fields now expose a visible placeholder so they can still be clicked during review.
+- **Undo/Redo Reliability**: Improved reviewer editing behavior and documentation around native undo/redo handling.
 
 ## 7.0.0 - 2026-03-23
 
