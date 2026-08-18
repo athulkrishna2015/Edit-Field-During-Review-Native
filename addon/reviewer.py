@@ -1008,7 +1008,13 @@ class EFDRC:
             timer_started = getattr(
                 reviewer.card, "timer_started", getattr(reviewer.card, "timerStarted", None)
             )
-            reviewer.card = mw.col.getCard(reviewer.card.id)
+            try:
+                reviewer.card = mw.col.getCard(reviewer.card.id)
+            except Exception as e:
+                logger.warning(f"Card no longer exists after save ({reviewer.card.id}); advancing: {e}")
+                reviewer.card = None
+                reviewer._showQuestion()
+                return
             if timer_started is not None:
                 if hasattr(reviewer.card, "timer_started"):
                     reviewer.card.timer_started = timer_started
