@@ -13,7 +13,20 @@ LOG_FILE_NAME = "efdrn.log"
 class LogSignal(QObject):
     new_record = pyqtSignal()
 
-_log_signal = LogSignal()
+_log_signal: Optional[LogSignal] = None
+
+
+def _get_log_signal() -> LogSignal:
+    global _log_signal
+    if _log_signal is None:
+        try:
+            _log_signal = LogSignal()
+        except Exception:
+            # Fallback: create without parent if QApplication not ready
+            _log_signal = LogSignal.__new__(LogSignal)  # type: ignore
+            QObject.__init__(_log_signal)  # type: ignore
+    return _log_signal
+
 
 class LogHandler(logging.Handler):
     def __init__(self):
@@ -27,7 +40,11 @@ class LogHandler(logging.Handler):
             self.records.append(msg)
             if len(self.records) > self.max_records:
                 self.records.pop(0)
-            _log_signal.new_record.emit()
+            try:
+                _get_log_signal().new_record.emit()
+            except RuntimeError:
+                # Signal emitted before Qt event loop ready or after app quit
+                pass
         except Exception:
             self.handleError(record)
 
@@ -55,4 +72,7 @@ def setup_file_logging():
         pass
 
 def connect_log_signal(slot):
-    _log_signal.new_record.connect(slot)
+    try:
+        _get_log_signal().new_record.connect(slot)
+    except Exception:
+        pass

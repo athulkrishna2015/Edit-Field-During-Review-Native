@@ -1,8 +1,9 @@
-from . import reviewer
 from .log_handler import setup_file_logging, logger
 
 setup_file_logging()
 logger.info("EFDRN loaded")
+
+from . import reviewer  # noqa: E402  (import after logging setup)
 
 import os
 import json

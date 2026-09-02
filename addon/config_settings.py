@@ -117,7 +117,11 @@ class SettingsTab(QWidget):
         disable_all_btn.clicked.connect(lambda: self._set_all_items(Qt.CheckState.Unchecked))
 
     def _populate_tree(self):
-        for model in self.mw.col.models.all():
+        try:
+            models = self.mw.col.models.all()
+        except Exception:
+            return
+        for model in models:
             nt_item = QTreeWidgetItem(self.tree, [model["name"]])
             model_id = str(model["id"])
             nt_item.setData(0, MODEL_ID_ROLE, model_id)

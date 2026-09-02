@@ -174,9 +174,14 @@ def add_edit_filter_to_template(template_html: str, field_names: set[str]) -> st
         filters = parts[:-1]
         if field_name not in field_names:
             return match.group(0)
+        # Already has edit filter → leave as-is
         if any(filter_name.lower() == "edit" for filter_name in filters):
             return match.group(0)
+        # Never wrap type-answer fields
         if any(filter_name.lower().startswith("type") for filter_name in filters):
+            return match.group(0)
+        # Avoid double-wrapping if somehow already prefixed
+        if field_name.lower() == "edit":
             return match.group(0)
 
         return "{{" + ":".join(["edit", *parts]) + "}}"

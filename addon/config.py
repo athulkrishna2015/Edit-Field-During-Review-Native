@@ -160,6 +160,22 @@ def on_config_action(
     addon_manager: Any, module_name: str, on_save: Any, initial_tab: int = 0
 ) -> None:
     config = addon_manager.getConfig(module_name)
+    if not isinstance(config, dict):
+        # Fallback to defaults if config is missing/corrupt.
+        config = {
+            "auto_enable": True,
+            "show_outline": True,
+            "exclusions": {},
+            "exclusions_v2": {},
+            "trigger_modifier": "Ctrl",
+            "trigger_action": "Click",
+            "show_review_button": False,
+            "enable_undo": False,
+            "undo_style": "per_field",
+            "separate_editor_preferences": True,
+            "reviewer_editor_preferences": default_editor_preferences(),
+            "preload_add_window": True,
+        }
     dialog = QDialog(mw)
     dialog.setWindowTitle("EFDRN Configuration")
     dialog.setMinimumWidth(600)

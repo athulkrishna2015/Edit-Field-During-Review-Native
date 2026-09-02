@@ -24,6 +24,11 @@ from .editor import EmbeddedReviewerEditor
 from .log_handler import logger
 
 
+def _is_missing_card_error(exc: BaseException) -> bool:
+    """Recognize Anki's missing-card errors across backend versions."""
+    return "NotFoundError" in type(exc).__name__ or "No such card" in str(exc)
+
+
 class EFDRC:
     def __init__(self) -> None:
         self.addon_name = mw.addonManager.addonFromModule(__name__)
@@ -438,7 +443,7 @@ class EFDRC:
         if self.note_snapshot is None:
             return
 
-        undo_style = self.config.get("undo_style", "full_snapshot")
+        undo_style = self.config.get("undo_style", "per_field")
         if undo_style == "editor_only":
             return
 
@@ -564,7 +569,10 @@ class EFDRC:
         try:
             txt = txt or ""
             flds = ctx.note().model()["flds"]
-            idx = next((i for i, fld in enumerate(flds) if fld["name"] == field), 0)
+            idx = next((i for i, fld in enumerate(flds) if fld["name"] == field), None)
+            if idx is None:
+                # Field not in model (e.g. cloze:Text special syntax); don't wrap
+                return txt
             
             # Add a class if the field is empty to help with selection
             # We ignore hidden AI-Hints blocks which might be present but visually empty
@@ -1011,9 +1019,18 @@ class EFDRC:
             try:
                 reviewer.card = mw.col.getCard(reviewer.card.id)
             except Exception as e:
-                logger.warning(f"Card no longer exists after save ({reviewer.card.id}); advancing: {e}")
+                if not _is_missing_card_error(e):
+                    raise
+                logger.warning(f"Card no longer exists after save ({getattr(reviewer.card, 'id', '?')}); advancing: {e}")
                 reviewer.card = None
-                reviewer._showQuestion()
+                try:
+                    reviewer.nextCard()
+                except Exception as inner_e:
+                    logger.error(f"Failed to advance after card deletion: {inner_e}")
+                    try:
+                        mw.moveToState("overview")
+                    except Exception:
+                        pass
                 return
             if timer_started is not None:
                 if hasattr(reviewer.card, "timer_started"):
@@ -1021,12 +1038,30 @@ class EFDRC:
                 else:
                     reviewer.card.timerStarted = timer_started
             if reviewer.state == "question":
-                reviewer._showQuestion()
+                try:
+                    reviewer._showQuestion()
+                except Exception as e:
+                    if not _is_missing_card_error(e):
+                        raise
+                    logger.warning(f"Failed to show question after save ({e}); advancing")
+                    try:
+                        reviewer.nextCard()
+                    except Exception:
+                        pass
             elif reviewer.state == "answer":
-                reviewer._showAnswer()
+                try:
+                    reviewer._showAnswer()
+                except Exception as e:
+                    if not _is_missing_card_error(e):
+                        raise
+                    logger.warning(f"Failed to show answer after save ({e}); advancing")
+                    try:
+                        reviewer.nextCard()
+                    except Exception:
+                        pass
 
     def _patch_dialogs_open(self) -> None:
-        if hasattr(aqt.dialogs, "_efdrn_wrapped"):
+        if getattr(aqt.dialogs, "_efdrn_wrapped", False):
             return
 
         original_open = aqt.dialogs.open
@@ -1043,8 +1078,9 @@ class EFDRC:
                         deck_id = current_card.current_deck_id()
                         if hasattr(instance, "deck_chooser"):
                             instance.deck_chooser.selected_deck_id = deck_id
-                            if hasattr(instance.deck_chooser, "on_deck_changed") and instance.deck_chooser.on_deck_changed:
-                                instance.deck_chooser.on_deck_changed(deck_id)
+                            deck_changed = getattr(instance.deck_chooser, "on_deck_changed", None)
+                            if callable(deck_changed):
+                                deck_changed(deck_id)
                     
                     if not instance.isVisible():
                         instance.show()
@@ -1060,6 +1096,7 @@ class EFDRC:
                 self.schedule_add_window_preload(delay_ms=1000)
 
         patched_open._efdrn_wrapped = True  # type: ignore[attr-defined]
+        aqt.dialogs._efdrn_wrapped = True  # type: ignore[attr-defined]
         aqt.dialogs.open = patched_open
         aqt.dialogs.markClosed = patched_mark_closed
 
@@ -1158,10 +1195,79 @@ if hasattr(Reviewer, "op_executed"):
                 # machinery. Let the editor stay in control and rely on the
                 # normal reviewer reload when editing finishes.
                 return False
-            return _efdrn_original_op_executed(reviewer, changes, handler, focused)
+            try:
+                return _efdrn_original_op_executed(reviewer, changes, handler, focused)
+            except Exception as e:
+                # Anki can report deleted cards with different exception classes
+                # across versions, so only swallow known missing-card failures.
+                if not _is_missing_card_error(e):
+                    raise
+                logger.warning(f"Card not found during op_executed ({e}); advancing gracefully")
+                try:
+                    reviewer.card = None
+                    reviewer.nextCard()
+                except Exception as inner_e:
+                    logger.error(f"Failed to advance after missing card: {inner_e}")
+                    try:
+                        mw.moveToState("overview")
+                    except Exception:
+                        pass
+                return False
 
         _efdrn_reviewer_op_executed._efdrn_wrapped = True  # type: ignore[attr-defined]
         Reviewer.op_executed = _efdrn_reviewer_op_executed
+
+# Harden refresh paths that are triggered from focus changes and other hooks.
+# These can also raise NotFoundError when the card was deleted externally.
+if hasattr(Reviewer, "refresh_if_needed") and not getattr(
+    Reviewer.refresh_if_needed, "_efdrn_wrapped", False
+):
+    _efdrn_original_refresh_if_needed = Reviewer.refresh_if_needed
+
+    def _efdrn_safe_refresh_if_needed(self: Reviewer) -> None:
+        try:
+            return _efdrn_original_refresh_if_needed(self)
+        except Exception as e:
+            if not _is_missing_card_error(e):
+                raise
+            logger.warning(f"Card not found during refresh_if_needed ({e}); moving to next card")
+            try:
+                self.card = None
+                self.nextCard()
+            except Exception as inner_e:
+                logger.error(f"Failed to recover from refresh missing card: {inner_e}")
+                try:
+                    mw.moveToState("overview")
+                except Exception:
+                    pass
+
+    _efdrn_safe_refresh_if_needed._efdrn_wrapped = True  # type: ignore[attr-defined]
+    Reviewer.refresh_if_needed = _efdrn_safe_refresh_if_needed
+
+if hasattr(Reviewer, "_redraw_current_card") and not getattr(
+    Reviewer._redraw_current_card, "_efdrn_wrapped", False
+):
+    _efdrn_original_redraw = Reviewer._redraw_current_card
+
+    def _efdrn_safe_redraw(self: Reviewer) -> None:
+        try:
+            return _efdrn_original_redraw(self)
+        except Exception as e:
+            if not _is_missing_card_error(e):
+                raise
+            logger.warning(f"Card not found during _redraw_current_card ({e}); advancing")
+            try:
+                self.card = None
+                self.nextCard()
+            except Exception as inner_e:
+                logger.error(f"Failed to recover from redraw missing card: {inner_e}")
+                try:
+                    mw.moveToState("overview")
+                except Exception:
+                    pass
+
+    _efdrn_safe_redraw._efdrn_wrapped = True  # type: ignore[attr-defined]
+    Reviewer._redraw_current_card = _efdrn_safe_redraw
 
 if not getattr(anki.template.TemplateRenderContext._partially_render, "_efdrn_wrapped", False):
     _efdrn_original_partially_render = anki.template.TemplateRenderContext._partially_render
