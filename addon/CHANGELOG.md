@@ -2,6 +2,11 @@
 
 All notable changes to **Edit Field During Review Native** are documented in this file.
 
+## 7.4.3 - 2026-09-02
+
+- **Stability**: Hardened reviewer refresh and save-reload paths to recover cleanly when a card is deleted during editing or another refresh path hits a missing card.
+- **Robustness**: Tightened editor bridge handling, config fallback logic, log signal initialization, and template wrapping safeguards to avoid avoidable runtime failures on newer Anki versions.
+
 ## 7.4.2 - 2026-08-18
 
 - **Stability**: Fixed a crash when the card being edited is deleted during a note save (e.g., when changing card type removes the current card). The reviewer now detects the missing card and advances to the next card instead of raising a `NotFoundError`.
