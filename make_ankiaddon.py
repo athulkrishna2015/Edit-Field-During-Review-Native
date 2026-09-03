@@ -65,7 +65,7 @@ def create_ankiaddon(explicit_version: str | None = None) -> int:
     # Exclusions
     exclude_dirs = ['__pycache__', '.git', '.vscode', '.github', 'tests']
     exclude_exts = ['.ankiaddon', '.pyc', '.log']
-    exclude_files = ['meta.json', '.gitignore', '.gitmodules', 'mypy.ini']
+    exclude_files = ['meta.json', '.gitignore', '.gitmodules', 'mypy.ini', 'CHANGELOG.md']
 
     print(f"Creating {final_name} from {ADDON_DIR}...")
 

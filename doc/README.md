@@ -11,6 +11,7 @@ This folder contains developer and user documentation for the **Edit Field Durin
 | [features.md](features.md) | Full add-on description, feature list, and how it works. |
 | [configuration.md](configuration.md) | Every setting, its default value, allowed values, and the underlying JSON structures. |
 | [code-structure.md](code-structure.md) | Module layout, classes, functions, variables, and inter-module flow. |
+| [CHANGELOG.md](CHANGELOG.md) | All notable changes organized by version. |
 
 ## Quick Reference
 
