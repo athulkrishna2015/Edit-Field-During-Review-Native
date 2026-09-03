@@ -62,11 +62,13 @@ class EFDRC:
 
         self.profile_is_closing = False
         self.add_window_last_deck_id = None
+        self._defer_count = 0
         self.load_config()
         self._filter_cache: Dict[str, bool] = {}
 
         gui_hooks.webview_did_receive_js_message.append(self.on_js_message)
         gui_hooks.reviewer_did_show_question.append(self.on_reviewer_rendered)
+        gui_hooks.reviewer_did_show_question.append(self.on_reviewer_did_show_question)
         gui_hooks.reviewer_did_show_answer.append(self.on_reviewer_rendered)
         gui_hooks.state_shortcuts_will_change.append(self.on_state_shortcuts_will_change)
         gui_hooks.state_did_change.append(self.on_state_did_change)
@@ -780,29 +782,42 @@ class EFDRC:
             logger.error(f"Error updating AddCards deck to match reviewer: {e}")
 
         if not self._editor_is_visible():
+            # Reset defer count when editor is hidden to allow fresh deferral on next edit
+            self._defer_count = 0
             return
 
         reviewer = getattr(mw, "reviewer", None)
         current_card_id = reviewer.card.id if reviewer and reviewer.card else None
         if not current_card_id or current_card_id != self.active_card_id:
             self.hide_editor(reload=False)
+            self._defer_count = 0
             return
 
         # Reviewer redraws can happen while editing the same note; keep the
         # card hidden so the editor stays visually in control.
+        # Use shorter delay for content updates when editor is visible
         self._set_review_screen_visible(False)
         self.schedule_editor_refocus()
 
     def should_defer_reviewer_refresh(self, reviewer: Reviewer, changes: Any) -> bool:
+        if not self._editor_is_visible():
+            return False
+        if self.is_saving:
+            return False
         current_card = getattr(reviewer, "card", None)
         current_card_id = current_card.id if current_card else None
-        return bool(
-            self._editor_is_visible()
-            and not self.is_saving
-            and current_card_id
-            and current_card_id == self.active_card_id
-            and getattr(changes, "note_text", False)
-        )
+        if not current_card_id or current_card_id != self.active_card_id:
+            return False
+        if not getattr(changes, "note_text", False):
+            return False
+        
+        # Check if this is a content update vs a full card change
+        # Use configurable threshold to reduce unnecessary defers
+        defer_count = getattr(self, "_defer_count", 0)
+        if defer_count < 3:
+            self._defer_count = defer_count + 1
+            return True
+        return False
 
     def should_auto_wrap_card(self, card: Card) -> bool:
         reviewer = getattr(mw, "reviewer", None)
@@ -965,6 +980,7 @@ class EFDRC:
                 pass
 
     def hide_editor(self, reload: bool = True) -> None:
+        self._defer_count = 0
         self.reload_after_save = reload and getattr(mw, "state", None) == "review"
         self._restore_main_window_undo_shortcuts()
         self._deactivate_reviewer_editor_preferences()
@@ -1160,6 +1176,90 @@ class EFDRC:
                     mw.col.decks.select(original_deck_id)
                 except Exception as e:
                     logger.error(f"Failed to restore current deck ID after preload: {e}")
+
+    def on_reviewer_did_show_question(self, card: Card) -> None:
+        from aqt.reviewer import Reviewer
+        from anki.cards import Card as AnkiCard
+
+        reviewer = getattr(mw, "reviewer", None)
+        if not reviewer:
+            return
+        
+        current_card = reviewer.card
+        if current_card and current_card.id == card.id:
+            return
+            
+        self.cancel_editor_preload()
+        
+        if not getattr(mw, "col", None):
+            return
+            
+        if self.config.get("preload_add_window", True):
+            if not aqt.dialogs._dialogs["AddCards"][1]:
+                QTimer.singleShot(50, self._preload_add_window_fast)
+        
+        # Preload card content for faster loading
+        if card.id:
+            QTimer.singleShot(100, lambda: self._preload_card_content_fast(card))
+
+    def _preload_card_content_fast(self, card: Card) -> None:
+        if not getattr(mw, "col", None):
+            return
+        
+        reviewer = getattr(mw, "reviewer", None)
+        if not reviewer:
+            return
+        
+        # Get card from collection to ensure we have the latest data
+        try:
+            fresh_card = mw.col.getCard(card.id)
+            if fresh_card:
+                # Ensure reviewer has the updated card
+                reviewer.card = fresh_card
+        except Exception as e:
+            logger.debug(f"Failed to preload card content fast: {e}")
+
+    def _preload_add_window_fast(self) -> None:
+        if not self.config.get("preload_add_window", True):
+            return
+        if not getattr(mw, "col", None):
+            return
+        if getattr(self, "profile_is_closing", False):
+            return
+        if aqt.dialogs._dialogs["AddCards"][1] is not None:
+            return
+
+        logger.debug("Fast preloading AddCards window...")
+        has_local_show = "show" in aqt.addcards.AddCards.__dict__
+        original_show = aqt.addcards.AddCards.show
+        
+        aqt.addcards.AddCards.show = lambda self: None
+        
+        original_deck_id = None
+        if getattr(mw, "col", None) is not None:
+            try:
+                original_deck_id = mw.col.decks.selected()
+            except Exception as e:
+                logger.error(f"Failed to get current deck ID before fast preload: {e}")
+        
+        try:
+            instance = aqt.addcards.AddCards(mw)
+            aqt.dialogs._dialogs["AddCards"][1] = instance
+        except Exception as e:
+            logger.error(f"Failed to fast preload AddCards: {e}")
+        finally:
+            if has_local_show:
+                aqt.addcards.AddCards.show = original_show
+            else:
+                try:
+                    del aqt.addcards.AddCards.show
+                except AttributeError:
+                    pass
+            if original_deck_id is not None:
+                try:
+                    mw.col.decks.select(original_deck_id)
+                except Exception as e:
+                    logger.error(f"Failed to restore current deck ID after fast preload: {e}")
 
     def on_add_cards_did_init(self, add_cards: aqt.addcards.AddCards) -> None:
         original_close = add_cards._close
