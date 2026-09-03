@@ -65,6 +65,7 @@ Module side effects:
 | `add_window_last_deck_id` | int \| `None` | Last selected deck in the Add Cards dialog. |
 | `config` | dict | The add-on configuration. |
 | `_filter_cache` | dict | Cache of per-(model/template/field) edit-filter decisions. |
+| `_defer_count` | int | Counter for throttled reviewer refresh deferrals (max 3). |
 
 #### Methods (grouped)
 
@@ -107,6 +108,10 @@ Module side effects:
 **Preload**
 - `schedule_editor_preload()` / `cancel_editor_preload()` / `_run_deferred_preload()` / `preload_editor()`
 - `_ensure_editor_ready(note)`, `_create_editor(note)`, `_editor_uses_parent_window()`
+- `schedule_add_window_preload(delay_ms)` / `_preload_add_window()` — original Add Cards preload (1 s default).
+- `_preload_add_window_fast()` — fast Add Cards preload (50 ms), triggered on question-show.
+- `_preload_card_content_fast(card)` — fetches fresh card data from the collection (100 ms), triggered on question-show.
+- `on_reviewer_did_show_question(card)` — fires on `reviewer_did_show_question`; cancels pending editor preload, schedules fast AddCards and card-content preloads.
 
 **Rendering / templates**
 - `_wrap(txt, field, ctx)` — wraps a field in `<span data-efdrc-idx="N">`.
@@ -133,7 +138,7 @@ Module side effects:
 #### Module-level hooks (installed after class definition)
 
 - `gui_hooks.webview_did_receive_js_message`
-- `gui_hooks.reviewer_did_show_question` / `reviewer_did_show_answer`
+- `gui_hooks.reviewer_did_show_question` (bound to `on_reviewer_rendered` and `on_reviewer_did_show_question`) / `reviewer_did_show_answer`
 - `gui_hooks.state_shortcuts_will_change` / `state_did_change`
 - `gui_hooks.profile_will_close` / `profile_did_open`
 - `gui_hooks.add_cards_did_init`

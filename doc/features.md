@@ -70,6 +70,8 @@ It is a re-engineering of the classic "Edit Field During Review (Cloze)" add-on 
 ### Performance & UX
 - **Preloads** the embedded editor when entering review (deferred via timer) to open almost instantly.
 - **Preload Add Cards window** option (default on): the Add Cards dialog is constructed in the background for near-instant opening, while preserving the user's selected deck.
+- **Optimized card content loading (7.4.4)**: When a new question card is shown, the Add Cards window and card content are preloaded proactively with reduced delays (50ms for AddCards, 100ms for card content), making "Study Now" and card transitions feel snappier.
+- **Throttled reviewer refresh (7.4.4)**: A defer counter limits consecutive deferrals (max 3) to prevent excessive refresh suppression while editing.
 - **Flicker-free** save: the reviewer webview is shown immediately during the save transition.
 - While editing, reviewer redraws are deferred so focus stays in the editor.
 
@@ -99,3 +101,8 @@ It is a re-engineering of the classic "Edit Field During Review (Cloze)" add-on 
   - `TemplateRenderContext._partially_render` — inject `edit` filter and fix cloze ord.
   - `aqt.addcards.AddCards.on_notetype_change` — preserve deck during review.
   - `aqt.dialogs.open` / `aqt.dialogs.markClosed` — preload Add Cards.
+
+### Reviewer Hooks (7.4.4)
+- `gui_hooks.reviewer_did_show_question` now also fires `on_reviewer_did_show_question`, which cancels any pending editor preload and schedules:
+  - `_preload_add_window_fast` (50 ms) — fast Add Cards preloading.
+  - `_preload_card_content_fast` (100 ms) — fresh card fetch from the collection.

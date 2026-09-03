@@ -2,7 +2,7 @@
 
 This folder contains developer and user documentation for the **Edit Field During Review (Native)** add-on.
 
-> Package ID: `efdrn` · Latest version: `7.4.3` · License: GNU AGPL v3
+> Package ID: `efdrn` · Latest version: `7.4.4` · License: GNU AGPL v3
 
 ## Index
 
