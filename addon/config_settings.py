@@ -141,14 +141,6 @@ class SettingsTab(QWidget):
         )
         grid.addWidget(self.separate_prefs_cb, 8, 0, 1, 2)
 
-        prefs_help = QLabel(
-            "When enabled, changes to color memory, tags collapse state, MathJax, "
-            "image shrink, HTML closing, and paste options stay local to the "
-            "embedded reviewer editor."
-        )
-        prefs_help.setWordWrap(True)
-        grid.addWidget(prefs_help, 9, 0, 1, 2)
-
         self.preload_add_cb = QCheckBox("Preload Add Cards window for faster opening")
         self.preload_add_cb.setChecked(self.config.get("preload_add_window", True))
         self.preload_add_cb.setToolTip(
@@ -164,18 +156,6 @@ class SettingsTab(QWidget):
         # Exclusions section
         excl_grp = QGroupBox("Exclusions")
         excl_layout = QVBoxLayout(excl_grp)
-        excl_help = QLabel(
-            "Disable editing for specific Note Types, Templates, or Fields. "
-            "Uncheck items you want to exclude from editing. The exclusion tree "
-            "uses stable internal IDs so your settings survive note-type renames."
-        )
-        excl_help.setWordWrap(True)
-        excl_help.setToolTip(
-            "Selectively disable EFDRN editing on a per-note-type, per-template, "
-            "or per-field basis. Unchecked items are excluded."
-        )
-        excl_layout.addWidget(excl_help)
-
         self.tree = QTreeWidget()
         self.tree.setHeaderLabels(["Note Type / Template / Field"])
         self.tree.setToolTip(
