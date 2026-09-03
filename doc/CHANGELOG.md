@@ -2,6 +2,10 @@
 
 All notable changes to **Edit Field During Review Native** are documented in this file.
 
+## 7.4.5 - 2026-09-03
+
+- **Documentation**: Moved `CHANGELOG.md` from `addon/` to `doc/` to keep the addon package lean and exclude non-runtime files from the `.ankiaddon` build. Added `CHANGELOG.md` to `make_ankiaddon.py` exclusion list and referenced it in `doc/README.md`.
+
 ## 7.4.4 - 2026-09-03
 
 - **Performance**: Optimized review screen card content loading speed. When pressing "Study Now" or moving between cards, the Add Cards window and card content are now preloaded proactively with reduced delays (50ms for AddCards, 100ms for card content), making the review experience feel snappier.
