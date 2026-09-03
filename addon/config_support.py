@@ -28,7 +28,15 @@ class SupportTab(QWidget):
         self._setup_ui()
 
     def _setup_ui(self):
-        layout = QVBoxLayout(self)
+        # Create a scroll area for the entire tab content
+        scroll_area = QScrollArea(self)
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QScrollArea.Shape.NoFrame)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        
+        # Main content widget
+        content_widget = QWidget()
+        layout = QVBoxLayout(content_widget)
         layout.setContentsMargins(10, 10, 10, 10)
 
         instr = QLabel(
@@ -46,16 +54,6 @@ class SupportTab(QWidget):
         self.supporter_check.toggled.connect(self.on_supporter_check_toggled)
         layout.addWidget(self.supporter_check, 0, Qt.AlignmentFlag.AlignCenter)
         layout.addSpacing(10)
-
-        # Scroll area for QR codes
-        scroll = QScrollArea(self)
-        scroll.setWidgetResizable(True)
-        scroll_content = QWidget()
-        self.qr_list = QVBoxLayout(scroll_content)
-        self.qr_list.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-        self.qr_list.setSpacing(30)
-        scroll.setWidget(scroll_content)
-        layout.addWidget(scroll)
 
         # Ko-fi Widget
         self.support_webview = AnkiWebView(self)
@@ -77,6 +75,18 @@ class SupportTab(QWidget):
         """
         self.support_webview.setHtml(kofi_html)
         layout.addWidget(self.support_webview)
+
+        # QR codes in a scrollable area within the main scroll
+        qr_scroll = QScrollArea(self)
+        qr_scroll.setWidgetResizable(True)
+        qr_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        qr_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        qr_content = QWidget()
+        self.qr_list = QVBoxLayout(qr_content)
+        self.qr_list.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        self.qr_list.setSpacing(30)
+        qr_scroll.setWidget(qr_content)
+        layout.addWidget(qr_scroll)
 
         base_path = os.path.dirname(__file__)
 
@@ -134,6 +144,14 @@ class SupportTab(QWidget):
         add_qr("UPI", "athulkrishnasv2015-2@okhdfcbank", "UPI.jpg")
         add_qr("BTC", "bc1qrrek3m7sr33qujjrktj949wav6mehdsk057cfx", "BTC.jpg")
         add_qr("ETH", "0xce6899e4903EcB08bE5Be65E44549fadC3F45D27", "ETH.jpg")
+
+        layout.addStretch()
+        scroll_area.setWidget(content_widget)
+
+        # Set the scroll area as the main layout
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.addWidget(scroll_area)
 
         self.load_supporter_state()
 

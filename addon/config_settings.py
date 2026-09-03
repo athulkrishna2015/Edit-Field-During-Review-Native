@@ -22,41 +22,89 @@ class SettingsTab(QWidget):
         self._setup_ui()
 
     def _setup_ui(self):
-        layout = QVBoxLayout(self)
+        # Wrap entire settings in a scroll area so the tab works on small windows
+        scroll_area = QScrollArea(self)
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QScrollArea.Shape.NoFrame)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+
+        content_widget = QWidget()
+        layout = QVBoxLayout(content_widget)
 
         global_grp = QGroupBox("General Settings")
         grid = QGridLayout(global_grp)
-        
+
         self.auto_cb = QCheckBox("Enable by default for all fields")
         self.auto_cb.setChecked(self.config.get("auto_enable", True))
+        self.auto_cb.setToolTip(
+            "When enabled, all rendered fields are made editable automatically without "
+            "needing explicit edit: filters in templates.\n\n"
+            "When disabled, only fields explicitly marked with {{edit:Field}} are editable."
+        )
         grid.addWidget(self.auto_cb, 0, 0, 1, 2)
-        
-        self.outline_cb = QCheckBox("Show visual outline on Hover")
+
+        self.outline_cb = QCheckBox("Show visual outline on hover")
         self.outline_cb.setChecked(self.config.get("show_outline", True))
+        self.outline_cb.setToolTip(
+            "Show a dashed outline around editable fields when the configured trigger "
+            "modifier is held down (or always when modifier is 'None').\n\n"
+            "Helps you identify which fields can be clicked to open the editor."
+        )
         grid.addWidget(self.outline_cb, 1, 0, 1, 2)
-        
-        grid.addWidget(QLabel("Trigger Modifier:"), 2, 0)
+
+        trigger_mod_label = QLabel("Trigger modifier:")
+        trigger_mod_label.setToolTip(
+            "Key modifier that must be held down to activate editing."
+        )
+        grid.addWidget(trigger_mod_label, 2, 0)
         self.mod_combo = QComboBox()
         self.mod_combo.addItems(["Ctrl", "Shift", "Alt", "None"])
         self.mod_combo.setCurrentText(self.config.get("trigger_modifier", "Ctrl"))
+        self.mod_combo.setToolTip(
+            "Key modifier required to show the outline and enable editing.\n\n"
+            "• Ctrl — hold the Control key (default)\n"
+            "• Shift — hold the Shift key\n"
+            "• Alt — hold the Alt/Option key\n"
+            "• None — editing is always active when hovering over editable fields"
+        )
         grid.addWidget(self.mod_combo, 2, 1)
-        
-        grid.addWidget(QLabel("Trigger Action:"), 3, 0)
+
+        trigger_act_label = QLabel("Trigger action:")
+        trigger_act_label.setToolTip(
+            "Mouse action that opens the editor on an editable field."
+        )
+        grid.addWidget(trigger_act_label, 3, 0)
         self.act_combo = QComboBox()
         self.act_combo.addItems(["Click", "DoubleClick"])
         self.act_combo.setCurrentText(self.config.get("trigger_action", "Click"))
+        self.act_combo.setToolTip(
+            "How to open the editor on an editable field.\n\n"
+            "• Click — single click opens the editor\n"
+            "• DoubleClick — double click required to open the editor"
+        )
         grid.addWidget(self.act_combo, 3, 1)
-        
+
         self.show_review_button_cb = QCheckBox('Show "Edit (N)" button on the review screen')
         self.show_review_button_cb.setChecked(self.config.get("show_review_button", False))
+        self.show_review_button_cb.setToolTip(
+            "When enabled, a visible 'Edit (N)' button appears on the review screen.\n\n"
+            "You can click this button or use the N keyboard shortcut to open the "
+            "embedded editor directly without using the configured trigger modifier."
+        )
         grid.addWidget(self.show_review_button_cb, 4, 0, 1, 2)
 
         # --- Undo settings ---
         self.enable_undo_cb = QCheckBox("Enable Custom Undo (Ctrl+Z)")
         self.enable_undo_cb.setChecked(self.config.get("enable_undo", False))
+        self.enable_undo_cb.setToolTip(
+            "When enabled, Ctrl+Z performs custom undo instead of the standard in-editor undo.\n\n"
+            "The exact behavior is controlled by the 'Undo Style' setting below."
+        )
         grid.addWidget(self.enable_undo_cb, 5, 0, 1, 2)
 
-        grid.addWidget(QLabel("Undo Style:"), 6, 0)
+        undo_style_label = QLabel("Undo Style:")
+        undo_style_label.setToolTip("How Ctrl+Z behaves when custom undo is enabled.")
+        grid.addWidget(undo_style_label, 6, 0)
         self.undo_style_combo = QComboBox()
         self.undo_style_combo.addItems(list(UNDO_STYLE_MAP.keys()))
         current_style = self.config.get("undo_style", "per_field")
@@ -64,16 +112,13 @@ class SettingsTab(QWidget):
             if value == current_style:
                 self.undo_style_combo.setCurrentText(label)
                 break
-        grid.addWidget(self.undo_style_combo, 6, 1)
-
-        undo_style_help = QLabel(
-            "<b>Full Snapshot Revert</b>: Ctrl+Z reverts all fields to their state "
-            "when the editor was opened.<br>"
-            "<b>Per-Field Revert</b>: Ctrl+Z reverts only the currently focused field.<br>"
-            "<b>In-Editor Only</b>: Ctrl+Z performs standard in-editor undo only."
+        self.undo_style_combo.setToolTip(
+            "Choose how Ctrl+Z behaves when custom undo is enabled.\n\n"
+            "• Full Snapshot Revert — reverts ALL fields to the state when the editor opened\n"
+            "• Per-Field Revert (default) — reverts only the currently focused field\n"
+            "• In-Editor Only — standard in-editor undo (no snapshot-based revert)"
         )
-        undo_style_help.setWordWrap(True)
-        grid.addWidget(undo_style_help, 7, 0, 1, 2)
+        grid.addWidget(self.undo_style_combo, 6, 1)
 
         def _update_undo_controls(checked: bool) -> None:
             self.undo_style_combo.setEnabled(checked)
@@ -82,10 +127,20 @@ class SettingsTab(QWidget):
         _update_undo_controls(self.enable_undo_cb.isChecked())
 
         # --- Other settings ---
-        self.separate_prefs_cb = QCheckBox("Keep reviewer editor preferences separate from Anki's main editor")
-        self.separate_prefs_cb.setChecked(self.config.get("separate_editor_preferences", False))
+        self.separate_prefs_cb = QCheckBox(
+            "Keep reviewer editor preferences separate from Anki's main editor"
+        )
+        self.separate_prefs_cb.setChecked(
+            self.config.get("separate_editor_preferences", False)
+        )
+        self.separate_prefs_cb.setToolTip(
+            "When enabled, the embedded editor maintains its own independent preferences "
+            "for text color, highlight color, tag collapse state, MathJax rendering, "
+            "image shrink, HTML auto-close, and paste settings.\n\n"
+            "These stay separate from Anki's main editor settings."
+        )
         grid.addWidget(self.separate_prefs_cb, 8, 0, 1, 2)
-        
+
         prefs_help = QLabel(
             "When enabled, changes to color memory, tags collapse state, MathJax, "
             "image shrink, HTML closing, and paste options stay local to the "
@@ -96,25 +151,73 @@ class SettingsTab(QWidget):
 
         self.preload_add_cb = QCheckBox("Preload Add Cards window for faster opening")
         self.preload_add_cb.setChecked(self.config.get("preload_add_window", True))
+        self.preload_add_cb.setToolTip(
+            "When enabled, the Add Cards dialog is constructed in the background while "
+            "you're in review mode.\n\n"
+            "This makes the Add Cards window open almost instantly when you need it, "
+            "while preserving your currently selected deck."
+        )
         grid.addWidget(self.preload_add_cb, 10, 0, 1, 2)
 
         layout.addWidget(global_grp)
 
+        # Exclusions section
+        excl_grp = QGroupBox("Exclusions")
+        excl_layout = QVBoxLayout(excl_grp)
+        excl_help = QLabel(
+            "Disable editing for specific Note Types, Templates, or Fields. "
+            "Uncheck items you want to exclude from editing. The exclusion tree "
+            "uses stable internal IDs so your settings survive note-type renames."
+        )
+        excl_help.setWordWrap(True)
+        excl_help.setToolTip(
+            "Selectively disable EFDRN editing on a per-note-type, per-template, "
+            "or per-field basis. Unchecked items are excluded."
+        )
+        excl_layout.addWidget(excl_help)
+
         self.tree = QTreeWidget()
         self.tree.setHeaderLabels(["Note Type / Template / Field"])
+        self.tree.setToolTip(
+            "Tree of note types, their templates, and fields.\n\n"
+            "Uncheck a Note Type to disable editing for all its cards.\n"
+            "Uncheck a Template (card type) to disable editing for that card type only.\n"
+            "Uncheck a Field to disable editing for that field across all cards in the note type."
+        )
+        self.tree.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.tree.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self._populate_tree()
-        layout.addWidget(self.tree)
+        excl_layout.addWidget(self.tree)
 
         bulk_row = QHBoxLayout()
         enable_all_btn = QPushButton("Enable All")
+        enable_all_btn.setToolTip(
+            "Check every Note Type, Template, and Field — makes everything editable."
+        )
         disable_all_btn = QPushButton("Disable All")
+        disable_all_btn.setToolTip(
+            "Uncheck every Note Type, Template, and Field — disables editing for everything."
+        )
         bulk_row.addWidget(enable_all_btn)
         bulk_row.addWidget(disable_all_btn)
         bulk_row.addStretch()
-        layout.addLayout(bulk_row)
+        excl_layout.addLayout(bulk_row)
 
-        enable_all_btn.clicked.connect(lambda: self._set_all_items(Qt.CheckState.Checked))
-        disable_all_btn.clicked.connect(lambda: self._set_all_items(Qt.CheckState.Unchecked))
+        enable_all_btn.clicked.connect(
+            lambda: self._set_all_items(Qt.CheckState.Checked)
+        )
+        disable_all_btn.clicked.connect(
+            lambda: self._set_all_items(Qt.CheckState.Unchecked)
+        )
+
+        layout.addWidget(excl_grp)
+        layout.addStretch()
+
+        scroll_area.setWidget(content_widget)
+
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.addWidget(scroll_area)
 
     def _populate_tree(self):
         try:
