@@ -2,6 +2,13 @@
 
 All notable changes to **Edit Field During Review Native** are documented in this file.
 
+## 7.4.4 - 2026-09-03
+
+- **Performance**: Optimized review screen card content loading speed. When pressing "Study Now" or moving between cards, the Add Cards window and card content are now preloaded proactively with reduced delays (50ms for AddCards, 100ms for card content), making the review experience feel snappier.
+- **Refactored Preload Logic**: Added `on_reviewer_did_show_question` hook that triggers when a new question card is shown, canceling any pending editor preload and scheduling faster preloading of the Add Cards window and card content.
+- **Throttled Reviewer Refresh**: Added a defer counter to `should_defer_reviewer_refresh` that limits consecutive deferrals (max 3), preventing unnecessary refresh suppression while editing.
+- **New Methods**: Added `_preload_add_window_fast` and `_preload_card_content_fast` for faster content availability.
+
 ## 7.4.3 - 2026-09-02
 
 - **Stability**: Hardened reviewer refresh and save-reload paths to recover cleanly when a card is deleted during editing or another refresh path hits a missing card.
