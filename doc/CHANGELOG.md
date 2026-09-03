@@ -2,6 +2,13 @@
 
 All notable changes to **Edit Field During Review Native** are documented in this file.
 
+## 7.4.6 - 2026-09-03
+
+- **Config UI**: Added scroll areas to all config tabs (Settings, Support, Log) for better usability on small windows.
+- **Config UI**: Added tooltips to all settings in the Settings, Support, and Log tabs for clearer documentation.
+- **Config UI**: Fixed Log tab to fill the entire tab area with the log display.
+- **Config UI**: Removed redundant explanatory text labels now that tooltips provide the documentation.
+
 ## 7.4.5 - 2026-09-03
 
 - **Documentation**: Moved `CHANGELOG.md` from `addon/` to `doc/` to keep the addon package lean and exclude non-runtime files from the `.ankiaddon` build. Added `CHANGELOG.md` to `make_ankiaddon.py` exclusion list and referenced it in `doc/README.md`.
