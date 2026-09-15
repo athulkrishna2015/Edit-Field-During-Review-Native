@@ -2,6 +2,11 @@
 
 All notable changes to **Edit Field During Review Native** are documented in this file.
 
+## 7.5.0 - 2026-09-15
+
+- **Rich-Text Highlighting**: Fixed reviewer field outlines being incomplete around nested HTML, tables, lists, paragraphs, and other block-level content.
+- **Cloze Highlighting**: Other cloze deletions now use a subtle sky-blue text color while the trigger modifier is held, without changing the current cloze or adding a second outline.
+
 ## 7.4.6 - 2026-09-03
 
 - **Config UI**: Added scroll areas to all config tabs (Settings, Support, Log) for better usability on small windows.
