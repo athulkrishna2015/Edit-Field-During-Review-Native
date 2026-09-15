@@ -1,5 +1,8 @@
 span[data-efdrc-idx] {
     text-decoration: none !important;
+    /* Paint each inline fragment so nested HTML does not break the outline. */
+    -webkit-box-decoration-break: clone !important;
+    box-decoration-break: clone !important;
 }
 
 .efdrc-active [data-efdrc-idx],
@@ -10,7 +13,17 @@ span[data-efdrc-idx] {
 .efdrc-active #io-image {
     outline: 1px dashed #0078d4 !important;
     outline-offset: 1px !important;
+    border: 1px dashed #0078d4 !important;
+    border-radius: 2px !important;
     cursor: pointer !important;
+}
+
+/* Anki uses .cloze-inactive for the other cloze numbers. Leave the current
+   .cloze untouched so only the remaining deletions are highlighted. */
+.efdrc-active .cloze-inactive {
+    color: #0078d4 !important;
+    background-color: rgba(0, 120, 212, 0.12) !important;
+    border-radius: 2px !important;
 }
 
 .efdrc-active [data-efdrc-idx]:hover,

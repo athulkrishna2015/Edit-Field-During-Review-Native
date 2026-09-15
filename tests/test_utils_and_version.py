@@ -89,8 +89,10 @@ class VersionTests(unittest.TestCase):
 
     def test_sync_files_are_not_written_by_unit_helpers(self):
         # Keep this test explicit so the suite remains safe to run in the repo.
-        self.assertTrue(Path("addon/manifest.json").is_file())
-        self.assertEqual(json.loads(Path("addon/manifest.json").read_text())["version"], "7.4.3")
+        manifest = json.loads(Path("addon/manifest.json").read_text())
+        version = Path("addon/VERSION").read_text().strip()
+        self.assertEqual(manifest["version"], version)
+        self.assertEqual(manifest["human_version"], version)
 
 
 if __name__ == "__main__":
