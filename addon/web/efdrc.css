@@ -13,8 +13,6 @@ span[data-efdrc-idx] {
 .efdrc-active #io-image {
     outline: 1px dashed #0078d4 !important;
     outline-offset: 1px !important;
-    border: 1px dashed #0078d4 !important;
-    border-radius: 2px !important;
     cursor: pointer !important;
 }
 
