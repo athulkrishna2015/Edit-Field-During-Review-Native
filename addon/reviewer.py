@@ -591,7 +591,16 @@ class EFDRC:
             stripped = check_txt.strip().lower()
             is_empty = not stripped or stripped in ("<br>", "<br/>", "<br />", "<div></div>")
             cls = "efdrc-empty" if is_empty else ""
-            return f'<span data-efdrc-idx="{idx}" class="{cls}">{txt}</span>'
+            # A span cannot legally contain block elements such as tables or
+            # list items; browsers move those nodes outside the span, which
+            # leaves the clickable outline incomplete. Use a block wrapper
+            # for those fields so the whole rendered field stays together.
+            wrapper = "div" if re.search(
+                r"<(?:table|thead|tbody|tfoot|tr|th|td|ul|ol|li|p|div|h[1-6]|blockquote|pre)\b",
+                txt,
+                re.IGNORECASE,
+            ) else "span"
+            return f'<{wrapper} data-efdrc-idx="{idx}" class="{cls}">{txt}</{wrapper}>'
         except Exception:
             return txt or ""
 

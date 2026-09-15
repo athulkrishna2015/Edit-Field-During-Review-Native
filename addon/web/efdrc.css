@@ -21,9 +21,7 @@ span[data-efdrc-idx] {
 /* Anki uses .cloze-inactive for the other cloze numbers. Leave the current
    .cloze untouched so only the remaining deletions are highlighted. */
 .efdrc-active .cloze-inactive {
-    color: #0078d4 !important;
-    background-color: rgba(0, 120, 212, 0.06) !important;
-    border-radius: 2px !important;
+    color: #87ceeb !important;
 }
 
 .efdrc-active [data-efdrc-idx]:hover,
