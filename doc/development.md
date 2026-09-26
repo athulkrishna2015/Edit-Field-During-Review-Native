@@ -47,6 +47,7 @@ Notes:
 
 - `[data-efdrc-idx]` marks editable reviewer fields.
 - `.efdrc-active` is added while the configured trigger modifier is held down.
+- `.efdrc-outlines` is added on load when `show_outline` is enabled; the dashed outline rules are scoped to it, so hover and `.cloze-inactive` styling stay active either way.
 - On Image Occlusion cards, the supported embedded-editor entry points are the review-screen **Edit (N)** button and the `N` shortcut. `Ctrl+Click` is currently unreliable there.
 
 ## Versioning Scheme

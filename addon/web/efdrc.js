@@ -4,7 +4,8 @@
             modifier: 'Ctrl',
             action: 'Click',
             mode: 'reviewer',
-            isImageOcclusion: false
+            isImageOcclusion: false,
+            showOutline: false
         },
         isImageOcclusionTarget: function(element) {
             const mediaTags = new Set([
@@ -103,6 +104,12 @@
             if (this.config.mode === 'bottom') {
                 this.injectNativeButton();
                 return;
+            }
+
+            if (this.config.showOutline) {
+                document.body.classList.add('efdrc-outlines');
+            } else {
+                document.body.classList.remove('efdrc-outlines');
             }
 
             const handleTrigger = (event) => {

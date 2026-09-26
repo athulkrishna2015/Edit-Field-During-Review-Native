@@ -1,6 +1,6 @@
 {
     "auto_enable": true,
-    "show_outline": true,
+    "show_outline": false,
     "exclusions": {},
     "exclusions_v2": {},
     "trigger_modifier": "Ctrl",

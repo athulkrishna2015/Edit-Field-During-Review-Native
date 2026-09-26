@@ -44,11 +44,12 @@ class SettingsTab(QWidget):
         grid.addWidget(self.auto_cb, 0, 0, 1, 2)
 
         self.outline_cb = QCheckBox("Show visual outline on hover")
-        self.outline_cb.setChecked(self.config.get("show_outline", True))
+        self.outline_cb.setChecked(self.config.get("show_outline", False))
         self.outline_cb.setToolTip(
             "Show a dashed outline around editable fields when the configured trigger "
             "modifier is held down (or always when modifier is 'None').\n\n"
-            "Helps you identify which fields can be clicked to open the editor."
+            "Disabled by default. This only controls the dashed border; the hover "
+            "highlight of editable fields and the inactive cloze colour are unaffected."
         )
         grid.addWidget(self.outline_cb, 1, 0, 1, 2)
 

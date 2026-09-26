@@ -80,6 +80,32 @@ class UtilsTests(unittest.TestCase):
         self.assertFalse(field_allowed_for_card(card, "Back", config))
 
 
+class WebAssetTests(unittest.TestCase):
+    """The dashed outline is opt-in; hover and cloze styling must not be."""
+
+    def setUp(self):
+        root = Path(__file__).resolve().parents[1] / "addon" / "web"
+        self.css = (root / "efdrc.css").read_text()
+        self.js = (root / "efdrc.js").read_text()
+
+    def test_outline_is_opt_in(self):
+        self.assertIn(".efdrc-active.efdrc-outlines [data-efdrc-idx]", self.css)
+        self.assertIn("efdrc-outlines", self.js)
+
+    def test_hover_and_cloze_styling_is_not_gated(self):
+        for selector in (
+            ".efdrc-active [data-efdrc-idx]:hover",
+            ".efdrc-active .cloze-inactive",
+        ):
+            self.assertIn(selector, self.css)
+            self.assertNotIn(f".efdrc-outlines {selector.split('.efdrc-active ')[1]}", self.css)
+
+    def test_outline_defaults_to_disabled(self):
+        config = json.loads(Path("addon/config.json").read_text())
+        self.assertFalse(config["show_outline"])
+        self.assertIn("showOutline: false", self.js)
+
+
 class VersionTests(unittest.TestCase):
     def test_version_validation_and_bumping(self):
         self.assertEqual(validate_version("1.2"), "1.2.0")

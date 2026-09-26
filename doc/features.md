@@ -37,7 +37,7 @@ It is a re-engineering of the classic "Edit Field During Review (Cloze)" add-on 
 ### Customizable Triggers
 - Modifier: `Ctrl`, `Shift`, `Alt`, or `None`.
 - Action: `Click` or `DoubleClick`.
-- While the modifier is held (or always, when `None`), editable fields and Image Occlusion areas show a dashed outline on hover.
+- While the modifier is held (or always, when `None`), editable fields and Image Occlusion areas highlight on hover, and other cloze deletions are tinted sky blue. The dashed outline is opt-in via **Show outline** (off by default).
 
 ### Review Screen Native Button / Shortcut
 - Optional **Edit (N)** button on the review screen (off by default).

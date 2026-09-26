@@ -164,7 +164,7 @@ def on_config_action(
         # Fallback to defaults if config is missing/corrupt.
         config = {
             "auto_enable": True,
-            "show_outline": True,
+            "show_outline": False,
             "exclusions": {},
             "exclusions_v2": {},
             "trigger_modifier": "Ctrl",

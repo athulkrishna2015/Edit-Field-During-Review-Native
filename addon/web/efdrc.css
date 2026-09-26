@@ -5,15 +5,25 @@ span[data-efdrc-idx] {
     box-decoration-break: clone !important;
 }
 
+/* Editable targets always show a pointer cursor while the trigger is armed. */
 .efdrc-active [data-efdrc-idx],
 .efdrc-active #io-overlay,
 .efdrc-active #io-wrapper,
 .efdrc-active #io-header,
 .efdrc-active #io-footer,
 .efdrc-active #io-image {
+    cursor: pointer !important;
+}
+
+/* Dashed outlines are opt-in via the "Show visual outline" setting. */
+.efdrc-active.efdrc-outlines [data-efdrc-idx],
+.efdrc-active.efdrc-outlines #io-overlay,
+.efdrc-active.efdrc-outlines #io-wrapper,
+.efdrc-active.efdrc-outlines #io-header,
+.efdrc-active.efdrc-outlines #io-footer,
+.efdrc-active.efdrc-outlines #io-image {
     outline: 1px dashed #0078d4 !important;
     outline-offset: 1px !important;
-    cursor: pointer !important;
 }
 
 /* Anki uses .cloze-inactive for the other cloze numbers. Leave the current

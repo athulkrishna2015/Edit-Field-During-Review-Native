@@ -20,7 +20,7 @@ Install from [anki web](https://ankiweb.net/shared/info/2117554822)
 1. **Trigger the Editor**: During review, use the default trigger: **Ctrl + Click** (or **Cmd + Click** on Mac) on the field content.
 2. **Review Screen Native Button**: If enabled in config, click **Edit (N)** to open the embedded editor directly from the review screen. The **N** shortcut works regardless of button visibility.
 3. **Image Occlusion Cards**: On Image Occlusion notes, use the optional **Edit (N)** button or press **N** to open the embedded editor.
-4. **Visual Feedback**: When holding your trigger modifier, editable fields and Image Occlusion areas show a dashed outline on hover.
+4. **Visual Feedback**: When holding your trigger modifier, editable fields and Image Occlusion areas highlight on hover, and the other clozes in the note are tinted sky blue. The dashed outline is optional (off by default — enable **Show outline** in config).
 5. **Edit Your Content**: The native editor appears above your card. Standard Anki editor shortcuts and toolbar buttons are available.
 6. **Undo Support**: Ctrl+Z behavior is configurable. Enable "Custom Undo" in config to choose a style: **Per-Field Revert** (reverts only the focused field, default), **Full Snapshot Revert** (reverts all fields), or **In-Editor Only** (standard Ctrl+Z). Ctrl+Y always works for redo.
 7. **Save and Close**: Click the **Done** button, press **Ctrl + Enter**, or press **Esc** to save your changes and return to review immediately.
@@ -37,7 +37,7 @@ Access the configuration via either **Tools > Add-ons > EFDRN > Config** or **To
 
 - **Auto-enable**: Toggle whether the add-on should automatically enable editing for rendered note fields without the `edit:` filter.
 - **Explicit `edit:` support**: If Auto-enable is off, add `{{edit:FieldName}}` to any field you want clickable in review.
-- **Show outline**: Toggle the visual dashed outline on hover.
+- **Show outline**: Toggle the dashed outline on editable fields. Disabled by default; the hover highlight and inactive cloze colour are unaffected.
 - **Trigger Modifier**: Choose between `Ctrl`, `Shift`, `Alt`, or `None`.
 - **Trigger Action**: Choose between `Click` or `DoubleClick`.
 - **Show "Edit (N)" Button On Review Screen**: Toggle whether the extra review-screen button for the embedded editor is shown. Disabled by default.

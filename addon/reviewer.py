@@ -98,7 +98,7 @@ class EFDRC:
     def load_config(self) -> None:
         self.config = mw.addonManager.getConfig(self.addon_name) or {
             "auto_enable": True,
-            "show_outline": True,
+            "show_outline": False,
             "exclusions": {},
             "exclusions_v2": {},
             "trigger_modifier": "Ctrl",
@@ -108,6 +108,7 @@ class EFDRC:
             "reviewer_editor_preferences": {},
             "preload_add_window": True,
         }
+        self.config.setdefault("show_outline", False)
         self.config.setdefault("enable_undo", False)
         self.config.setdefault("undo_style", "per_field")
         self.config.setdefault("show_review_button", False)
@@ -648,14 +649,14 @@ class EFDRC:
         if isinstance(context, Reviewer):
             self._filter_cache.clear()
             web_content.js.append(f"/_addons/{addon_package}/web/efdrc.js")
-            if self.config.get("show_outline", True):
-                web_content.css.append(f"/_addons/{addon_package}/web/efdrc.css")
+            web_content.css.append(f"/_addons/{addon_package}/web/efdrc.css")
             reviewer = getattr(mw, "reviewer", None)
             card = reviewer.card if reviewer and reviewer.card else None
             js_conf = {
                 "modifier": self.config.get("trigger_modifier", "Ctrl"),
                 "action": self.config.get("trigger_action", "Click"),
                 "mode": "reviewer",
+                "showOutline": bool(self.config.get("show_outline", False)),
                 "isImageOcclusion": bool(
                     card and utils.note_is_image_occlusion(card.note())
                 ),

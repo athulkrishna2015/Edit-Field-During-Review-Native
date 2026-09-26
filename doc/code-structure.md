@@ -227,7 +227,8 @@ Class `LogTab(QWidget)`:
 ## Module: `web/efdrc.css`
 
 - `span[data-efdrc-idx]` — no text-decoration override.
-- `.efdrc-active [data-efdrc-idx], .efdrc-active #io-*` — dashed outline + pointer cursor.
+- `.efdrc-active [data-efdrc-idx], .efdrc-active #io-*` — pointer cursor (always).
+- `.efdrc-active.efdrc-outlines ...` — dashed outline, only when `show_outline` is enabled. The `efdrc-outlines` body class is set by `EFDRC.setup()` from the injected `showOutline` flag.
 - `.efdrc-active ...:hover` — soft blue highlight.
 - `.efdrc-active [data-efdrc-idx].efdrc-empty` — placeholder sizing + `"[ empty field ]"` label.
 

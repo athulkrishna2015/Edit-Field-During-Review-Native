@@ -23,7 +23,7 @@ Defaults come from `addon/config.json` and are mirrored in `reviewer.py:EFDRC.lo
 | Key | Type | Default | Allowed Values | Description |
 | --- | --- | --- | --- | --- |
 | `auto_enable` | bool | `true` | `true`, `false` | Auto-enable editing for all rendered fields without `edit:`. |
-| `show_outline` | bool | `true` | `true`, `false` | Show the dashed outline on hover while the trigger modifier is held. |
+| `show_outline` | bool | `false` | `true`, `false` | Show the dashed outline on editable fields while the trigger modifier is held. Off by default. Does not affect the hover highlight or the inactive cloze colour. |
 | `exclusions` | object | `{}` | note-type-keyed object | Legacy exclusions (keyed by note-type name). |
 | `exclusions_v2` | object | `{}` | note-type-ID-keyed object | Stable exclusions (keyed by note-type ID). |
 | `trigger_modifier` | string | `"Ctrl"` | `Ctrl`, `Shift`, `Alt`, `None` | Modifier required to trigger editing. |
