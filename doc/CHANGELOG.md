@@ -2,6 +2,10 @@
 
 All notable changes to **Edit Field During Review Native** are documented in this file.
 
+## 7.5.1 - 2026-09-16
+
+- **Configurable Outline**: The dashed blue outline on editable fields is now opt-in via the existing **Show outline** setting and is disabled by default. Enabling it no longer changes the hover highlight of editable fields or the sky-blue colour of the other cloze deletions, which now stay active regardless of the outline setting.
+
 ## 7.5.0 - 2026-09-15
 
 - **Rich-Text Highlighting**: Fixed reviewer field outlines being incomplete around nested HTML, tables, lists, paragraphs, and other block-level content.
