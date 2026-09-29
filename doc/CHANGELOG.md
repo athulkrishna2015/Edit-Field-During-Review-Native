@@ -2,6 +2,10 @@
 
 All notable changes to **Edit Field During Review Native** are documented in this file.
 
+## 7.5.2 - 2026-09-29
+
+- **Memory Leak Fix**: Fixed unbounded memory growth while the Add Cards window is preloaded. Because the preloaded dialog is created without being shown, Anki's `ensureWidgetInScreenBoundaries()` kept rescheduling itself every 50ms waiting for a window handle that never arrived, retaining roughly 1,200 dead timers per minute. The preloaded window is now given a native handle without being shown, so the retry chain stops immediately.
+
 ## 7.5.1 - 2026-09-16
 
 - **Configurable Outline**: The dashed blue outline on editable fields is now opt-in via the existing **Show outline** setting and is disabled by default. Enabling it no longer changes the hover highlight of editable fields or the sky-blue colour of the other cloze deletions, which now stay active regardless of the outline setting.
