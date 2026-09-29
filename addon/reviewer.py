@@ -1145,6 +1145,32 @@ class EFDRC:
 
         QTimer.singleShot(delay_ms, self._preload_add_window)
 
+    @staticmethod
+    def _force_window_handle(instance: aqt.addcards.AddCards, context: str) -> None:
+        """Give a preloaded (never-shown) AddCards a native window handle.
+
+        AddCards.__init__ calls restoreGeom -> ensureWidgetInScreenBoundaries,
+        which reschedules itself every 50ms until the window has a handle:
+
+            handle = window.windowHandle()
+            if not handle:
+                aqt.mw.progress.timer(50, lambda: ..., False, parent=widget)
+
+        We preload with show() stubbed out, so the dialog never becomes visible
+        and would never get a handle: the retry chain then runs forever,
+        retaining one dead QTimer per tick (~1200/min, measured). Because each
+        timer is parented to the dialog and its closure captures `instance`,
+        those retries also pin the whole hidden dialog between reloads.
+
+        winId() creates the native handle without showing the window, so the
+        chain stops after its first tick and the preload stays invisible.
+        """
+        try:
+            if instance.windowHandle() is None:
+                instance.winId()
+        except Exception as e:
+            logger.error(f"Failed to create window handle during {context}: {e}")
+
     def _preload_add_window(self) -> None:
         if not self.config.get("preload_add_window", True):
             return
@@ -1170,6 +1196,7 @@ class EFDRC:
         
         try:
             instance = aqt.addcards.AddCards(mw)
+            self._force_window_handle(instance, "preload")
             aqt.dialogs._dialogs["AddCards"][1] = instance
         except Exception as e:
             logger.error(f"Failed to preload AddCards: {e}")
@@ -1254,6 +1281,7 @@ class EFDRC:
         
         try:
             instance = aqt.addcards.AddCards(mw)
+            self._force_window_handle(instance, "fast preload")
             aqt.dialogs._dialogs["AddCards"][1] = instance
         except Exception as e:
             logger.error(f"Failed to fast preload AddCards: {e}")
