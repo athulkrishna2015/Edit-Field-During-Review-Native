@@ -1364,6 +1364,19 @@ if hasattr(Reviewer, "refresh_if_needed") and not getattr(
 
     def _efdrn_safe_refresh_if_needed(self: Reviewer) -> None:
         try:
+            controller = globals().get("efdrc")
+            if (
+                controller
+                and controller._editor_is_visible()
+                and not controller.is_saving
+            ):
+                current_card = getattr(self, "card", None)
+                current_card_id = current_card.id if current_card else None
+                if current_card_id and current_card_id == controller.active_card_id:
+                    # Refreshing/redrawing the hidden reviewer while the embedded
+                    # editor is active can replay card audio (e.g. on window
+                    # focus changes / alt-tab), which is disruptive.
+                    return None
             return _efdrn_original_refresh_if_needed(self)
         except Exception as e:
             if not _is_missing_card_error(e):
@@ -1389,6 +1402,17 @@ if hasattr(Reviewer, "_redraw_current_card") and not getattr(
 
     def _efdrn_safe_redraw(self: Reviewer) -> None:
         try:
+            controller = globals().get("efdrc")
+            if (
+                controller
+                and controller._editor_is_visible()
+                and not controller.is_saving
+            ):
+                current_card = getattr(self, "card", None)
+                current_card_id = current_card.id if current_card else None
+                if current_card_id and current_card_id == controller.active_card_id:
+                    # Avoid replaying card audio while the embedded editor owns the screen.
+                    return None
             return _efdrn_original_redraw(self)
         except Exception as e:
             if not _is_missing_card_error(e):

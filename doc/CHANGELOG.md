@@ -2,6 +2,11 @@
 
 All notable changes to **Edit Field During Review Native** are documented in this file.
 
+## 7.5.3 - 2026-11-18
+
+- **Audio Fix**: Prevented reviewer refresh/redraw from replaying card audio while the embedded editor is open (for example when Alt-Tabbing or regaining window focus).
+- **CI/Release**: Added a GitHub Actions release workflow to run tests, build the `.ankiaddon`, attach it to GitHub releases, and upload releases to AnkiWeb.
+
 ## 7.5.2 - 2026-09-29
 
 - **Memory Leak Fix**: Fixed unbounded memory growth while the Add Cards window is preloaded. Because the preloaded dialog is created without being shown, Anki's `ensureWidgetInScreenBoundaries()` kept rescheduling itself every 50ms waiting for a window handle that never arrived, retaining roughly 1,200 dead timers per minute. The preloaded window is now given a native handle without being shown, so the retry chain stops immediately.
