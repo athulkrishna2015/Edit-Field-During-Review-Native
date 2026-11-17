@@ -2,7 +2,7 @@
 
 All notable changes to **Edit Field During Review Native** are documented in this file.
 
-## 7.5.3 - 2026-11-18
+## 8.0.0 - 2026-11-18
 
 - **Audio Fix**: Prevented reviewer refresh/redraw from replaying card audio while the embedded editor is open (for example when Alt-Tabbing or regaining window focus).
 - **CI/Release**: Added a GitHub Actions release workflow to run tests, build the `.ankiaddon`, attach it to GitHub releases, and upload releases to AnkiWeb.
